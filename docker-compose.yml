@@ -1,0 +1,12 @@
+version: '3.8'
+
+services:
+  wgs84-cgcs2000:
+    build: .
+    container_name: wgs84-cgcs2000-converter
+    ports:
+      - "5000:5000"
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1  # 防止Python写入.pyc文件
+      - PYTHONUNBUFFERED=1        # 确保输出立即显示在日志中
+    restart: unless-stopped
