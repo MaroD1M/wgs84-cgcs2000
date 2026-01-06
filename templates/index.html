@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WGS84 ↔ 国家2000 双向坐标转换工具</title>
+    <title>WGS84/CGCS2000坐标转换与经纬度格式转换工具</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -60,7 +60,18 @@
     </style>
 </head>
 <body>
-    <h1 class="text-center mb-4">WGS84经纬度 ↔ 国家2000高斯投影 双向转换工具</h1>
+    <h1 class="text-center mb-4">WGS84/CGCS2000坐标转换与经纬度格式转换工具</h1>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">工具说明</h5>
+            <p class="card-text">
+                本工具提供WGS84与国家2000(CGCS2000)坐标系统的双向转换功能，
+                支持单点转换和批量转换，可处理经纬度与大地坐标之间的转换。
+                同时支持多种经纬度格式转换（十进制、度分秒、压矿格式）。
+            </p>
+        </div>
+    </div>
 
     <!-- 标签页导航 -->
     <ul class="nav nav-tabs" id="converterTabs" role="tablist">
@@ -69,6 +80,9 @@
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch" type="button" role="tab">批量转换</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="latlng-tab" data-bs-toggle="tab" data-bs-target="#latlng" type="button" role="tab">经纬度格式转换</button>
         </li>
     </ul>
 
@@ -95,48 +109,63 @@
                     <div class="form-group">
                         <label for="bandTypeSingle" class="form-label fw-bold">分带类型</label>
                         <select class="form-select" id="bandTypeSingle">
-                            <option value="3°分带" selected>3°分带（高频使用）</option>
-                            <option value="6°分带">6°分带（低频使用）</option>
-                        </select>
-                    </div>
+                        <option value="3°分带" selected>3°分带（高频使用）</option>
+                        <option value="6°分带">6°分带（低频使用）</option>
+                    </select>
+                </div>
+
+                <!-- 新增：小数位选择 -->
+                <div class="form-group">
+                    <label for="decimalPlacesSingle" class="form-label fw-bold">小数位数 <span class="text-muted" title="设置转换结果保留的小数位数，默认4位">ℹ️</span></label>
+                    <select class="form-select" id="decimalPlacesSingle">
+                        <option value="1">1位</option>
+                        <option value="2">2位</option>
+                        <option value="3">3位</option>
+                        <option value="4" selected>4位</option>
+                        <option value="5">5位</option>
+                        <option value="6">6位</option>
+                        <option value="7">7位</option>
+                        <option value="8">8位</option>
+                    </select>
+                </div>
 
                     <div class="form-group form-check">
                         <input type="checkbox" class="form-check-input" id="withBandSingle">
-                        <label class="form-check-label" for="withBandSingle">启用带号（默认不启用）</label>
+                        <label class="form-check-label" for="withBandSingle" title="启用后，国家2000高斯投影坐标结果将包含带号，例如：40450000.00（40带），适用于需要带号标识的GIS系统">启用带号（默认不启用） <span class="text-muted">ℹ️</span></label>
                     </div>
 
                     <!-- 动态输入区域（根据转换方向切换） -->
                     <div id="wgsInputGroup">
                         <div class="form-group">
-                            <label for="longitude" class="form-label">WGS84经度（°E）</label>
-                            <input type="text" class="form-control" id="longitude" placeholder="示例：116.397428（北京，范围：72.0-135.0）">
+                            <label for="longitude" class="form-label">WGS84经度（°E） <span class="text-muted" title="范围：72.0-135.0，国内经度范围">ℹ️</span></label>
+                            <input type="text" class="form-control" id="longitude" placeholder="示例：116.397428（北京天安门）">
                         </div>
 
                         <div class="form-group">
-                            <label for="latitude" class="form-label">WGS84纬度（°N）</label>
-                            <input type="text" class="form-control" id="latitude" placeholder="示例：39.909230（北京，范围：0.0-54.0）">
+                            <label for="latitude" class="form-label">WGS84纬度（°N） <span class="text-muted" title="范围：0.0-54.0，国内纬度范围">ℹ️</span></label>
+                            <input type="text" class="form-control" id="latitude" placeholder="示例：39.909230（北京天安门）">
                         </div>
                     </div>
 
                     <div id="cgcsInputGroup" style="display: none;">
                         <div class="form-group">
-                            <label for="cgcsX" class="form-label">国家2000 X坐标（米）</label>
+                            <label for="cgcsX" class="form-label">国家2000 X坐标（米） <span class="text-muted" title="高斯投影中的横坐标">ℹ️</span></label>
                             <input type="text" class="form-control" id="cgcsX" placeholder="示例：39535156.789（北京区域）">
                         </div>
 
                         <div class="form-group">
-                            <label for="cgcsY" class="form-label">国家2000 Y坐标（米）</label>
+                            <label for="cgcsY" class="form-label">国家2000 Y坐标（米） <span class="text-muted" title="高斯投影中的纵坐标">ℹ️</span></label>
                             <input type="text" class="form-control" id="cgcsY" placeholder="示例：3990923.123（北京区域）">
                         </div>
 
                         <div class="form-group">
-                            <label for="bandNumSingle" class="form-label">带号（必填）</label>
-                            <input type="text" class="form-control" id="bandNumSingle" placeholder="示例：38（3°分带：25-45；6°分带：13-23）">
+                            <label for="bandNumSingle" class="form-label">带号（必填） <span class="text-muted" title="3°分带范围：25-45；6°分带范围：13-23">ℹ️</span></label>
+                            <input type="text" class="form-control" id="bandNumSingle" placeholder="示例：38（北京区域）">
                         </div>
                     </div>
 
                     <div class="form-group text-center">
-                        <button class="btn btn-primary btn-lg" id="convertSingleBtn">执行转换</button>
+                        <button class="btn btn-primary btn-lg" id="convertSingleBtn" title="点击后执行单点坐标转换，结果将显示在右侧区域">执行转换</button>
                     </div>
                 </div>
 
@@ -159,58 +188,73 @@
                 <span class="direction-label">转换方向：</span>
                 <div class="form-check form-check-inline">
                     <input class="form-check-input" type="radio" name="batchDirection" id="batchWgs2cgcs" value="wgs2cgcs" checked>
-                    <label class="form-check-label" for="batchWgs2cgcs">WGS84经纬度 → 国家2000高斯投影</label>
+                    <label class="form-check-label" for="batchWgs2cgcs" title="将GPS获取的WGS84经纬度转换为国家2000高斯投影坐标">WGS84经纬度 → 国家2000高斯投影</label>
                 </div>
                 <div class="form-check form-check-inline">
                     <input class="form-check-input" type="radio" name="batchDirection" id="batchCgcs2wgs" value="cgcs2wgs">
-                    <label class="form-check-label" for="batchCgcs2wgs">国家2000高斯投影 → WGS84经纬度</label>
+                    <label class="form-check-label" for="batchCgcs2wgs" title="将国家2000高斯投影坐标转换为GPS可识别的WGS84经纬度">国家2000高斯投影 → WGS84经纬度</label>
                 </div>
             </div>
 
             <div class="batch-controls">
                 <div class="row">
                     <div class="col-md-3">
-                        <label for="bandTypeBatch" class="form-label fw-bold">分带类型</label>
+                        <label for="bandTypeBatch" class="form-label fw-bold">分带类型 <span class="text-muted" title="3°分带适用于高精度测量，6°分带适用于大范围地图绘制">ℹ️</span></label>
                         <select class="form-select" id="bandTypeBatch">
-                            <option value="3°分带" selected>3°分带（高频使用）</option>
-                            <option value="6°分带">6°分带（低频使用）</option>
-                        </select>
-                    </div>
+                        <option value="3°分带" selected>3°分带（高频使用）</option>
+                        <option value="6°分带">6°分带（低频使用）</option>
+                    </select>
+                </div>
+
+                <!-- 新增：小数位选择 -->
+                <div class="form-group">
+                    <label for="decimalPlacesBatch" class="form-label fw-bold">小数位数 <span class="text-muted" title="设置转换结果保留的小数位数，默认4位">ℹ️</span></label>
+                    <select class="form-select" id="decimalPlacesBatch">
+                        <option value="1">1位</option>
+                        <option value="2">2位</option>
+                        <option value="3">3位</option>
+                        <option value="4" selected>4位</option>
+                        <option value="5">5位</option>
+                        <option value="6">6位</option>
+                        <option value="7">7位</option>
+                        <option value="8">8位</option>
+                    </select>
+                </div>
 
                     <div class="col-md-2 d-flex align-items-end">
                         <div class="form-check">
                             <input type="checkbox" class="form-check-input" id="withBandBatch">
-                            <label class="form-check-label" for="withBandBatch">启用带号</label>
+                            <label class="form-check-label" for="withBandBatch" title="启用后，国家2000高斯投影坐标结果将包含带号，例如：40450000.00（40带），适用于需要带号标识的GIS系统">启用带号 <span class="text-muted">ℹ️</span></label>
                         </div>
                     </div>
 
                     <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-secondary" id="exportTemplateBtn">导出参考模板</button>
+                        <button class="btn btn-secondary" id="exportTemplateBtn" title="导出包含正确列名的空白模板，方便批量导入数据">导出参考模板</button>
                         <select class="form-select ms-2" id="templateType" style="width: auto;">
                             <option value="xlsx">Excel</option>
                             <option value="csv">CSV</option>
                             <option value="txt">TXT</option>
                         </select>
-                        <span id="templateHint" class="ms-2 text-muted">（含经度/纬度列）</span>
+                        <span id="templateHint" class="ms-2 text-muted" title="模板包含'经度'和'纬度'必填列，可根据需要添加其他列">（含经度/纬度列）</span>
                     </div>
                 </div>
 
                 <div class="row mt-3">
                     <div class="col-md-8">
-                        <label for="fileInput" class="form-label">选择数据文件</label>
-                        <input type="file" class="form-control" id="fileInput" accept=".xlsx,.csv,.txt">
+                        <label for="fileInput" class="form-label">选择数据文件 <span class="text-muted" title="文件需包含'经度'和'纬度'列，其他列会被保留">ℹ️</span></label>
+                        <input type="file" class="form-control" id="fileInput" accept=".xlsx,.csv,.txt" title="支持Excel、CSV和文本文件，大小限制为10MB">
                         <small id="fileHint" class="text-muted">支持.xlsx/.csv/.txt，需包含'经度'/'纬度'列（必填）</small>
                     </div>
 
                     <div class="col-md-4 d-flex align-items-end">
-                        <button class="btn btn-primary" id="startBatchBtn">开始批量转换</button>
-                        <button class="btn btn-success ms-2" id="exportResultsBtn" disabled>导出转换结果</button>
+                        <button class="btn btn-primary" id="startBatchBtn" title="点击后开始批量转换文件中的所有坐标点，大文件可能需要较长时间">开始批量转换</button>
+                        <button class="btn btn-success ms-2" id="exportResultsBtn" disabled title="转换完成后可用，导出所有转换结果到文件">导出转换结果</button>
                     </div>
                 </div>
 
                 <div class="row mt-2">
                     <div class="col-md-12">
-                        <div id="batchStatus" class="text-muted">状态：未选择文件</div>
+                        <div id="batchStatus" class="text-muted" title="显示批量转换的当前状态，包括文件选择、转换进度和完成情况">状态：未选择文件</div>
                     </div>
                 </div>
             </div>
@@ -231,6 +275,120 @@
                         <!-- 结果将通过JavaScript动态填充 -->
                     </tbody>
                 </table>
+            </div>
+        </div>
+
+        <!-- 经纬度格式转换标签页 -->
+        <div class="tab-pane fade" id="latlng" role="tabpanel" aria-labelledby="latlng-tab">
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5>经纬度格式转换</h5>
+                    <p class="text-muted">支持十进制格式与度分秒格式之间的相互转换</p>
+                    
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                        <input class="form-check-input" type="radio" name="latlngConversionType" id="decimalToDms" value="decimalToDms" checked>
+                        <label class="form-check-label" for="decimalToDms" title="将十进制经纬度（如116.4074）转换为度分秒格式（如116°24′26.64″）">
+                            十进制 → 度分秒
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="latlngConversionType" id="dmsToDecimal" value="dmsToDecimal">
+                        <label class="form-check-label" for="dmsToDecimal" title="将度分秒格式经纬度（如116°24′26.64″）转换为十进制（如116.4074）">
+                            度分秒 → 十进制
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="latlngConversionType" id="dmsToMining" value="dmsToMining">
+                        <label class="form-check-label" for="dmsToMining" title="将度分秒格式（如35°30'40.2516"）转换为矿产行业专用格式（如35.30402516）">
+                            度分秒 → 压矿格式（如35°30'40.2516" → 35.30402516）
+                        </label>
+                    </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 单点转换 -->
+                    <div class="mt-4">
+                        <h6>单点转换</h6>
+                        <div class="row">
+                            <div class="col-md-5">
+                                <div class="mb-3">
+                                    <label for="lngInput" class="form-label">经度 <span class="text-muted" title="支持十进制、度分秒格式，如116.4074或116°24′26.64″">ℹ️</span></label>
+                                    <input type="text" class="form-control" id="lngInput" placeholder="例如：116.4074 或 116°24′26.64″">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="latInput" class="form-label">纬度 <span class="text-muted" title="支持十进制、度分秒格式，如39.9042或39°54′15.12″">ℹ️</span></label>
+                                    <input type="text" class="form-control" id="latInput" placeholder="例如：39.9042 或 39°54′15.12″">
+                                </div>
+                                <button class="btn btn-primary" id="singleConvertBtn" title="点击后转换输入的坐标格式，结果将显示在右侧">转换</button>
+                                <button class="btn btn-secondary ms-2" id="clearSingleBtn" title="清空经度和纬度输入框中的内容">清空</button>
+                            </div>
+                            
+                            <div class="col-md-5 offset-md-2">
+                                <div class="mb-3">
+                                    <label class="form-label" title="显示格式转换后的经度和纬度结果">转换结果</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text" title="格式转换后的经度值">经度</span>
+                                        <input type="text" class="form-control" id="lngResult" readonly title="转换后的经度结果，可直接复制">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="input-group">
+                                        <span class="input-group-text" title="格式转换后的纬度值">纬度</span>
+                                        <input type="text" class="form-control" id="latResult" readonly title="转换后的纬度结果，可直接复制">
+                                    </div>
+                                </div>
+                                <button class="btn btn-success" id="copyResultBtn" title="一键复制经度和纬度的转换结果到剪贴板">复制结果</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 批量转换 -->
+                    <div class="mt-4">
+                        <h6>批量转换</h6>
+                        <div class="row">
+                            <div class="col-md-12">
+                                <label for="batchLatLngInput" class="form-label">批量输入（一行一组经纬度，纬度在前，经度在后，用空格、逗号或制表符分隔） <span class="text-muted" title="支持多种格式混合输入，系统会自动识别">ℹ️</span></label>
+                                <textarea class="form-control" id="batchLatLngInput" rows="6" placeholder="例如：
+116.4074,39.9042
+121.4737,31.2304
+or
+116°24′26.64″E,39°54′15.12″N
+121°28′25.32″E,31°13′49.44″N" title="支持十进制、度分秒格式，每行一组坐标"></textarea>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <button class="btn btn-primary" id="batchLatLngConvertBtn" title="点击后批量转换所有输入的坐标格式">批量转换</button>
+                                <button class="btn btn-secondary ms-2" id="clearBatchLatLngBtn" title="清空批量输入文本框中的所有内容">清空</button>
+                            </div>
+                            <div class="col-md-6 text-end">
+                                <button class="btn btn-success" id="exportLatLngResultBtn" disabled title="转换完成后可用，导出所有格式转换结果到文件">导出结果</button>
+                            </div>
+                        </div>
+                        
+                        <!-- 批量转换结果 -->
+                        <div class="mt-3">
+                            <h6>转换结果</h6>
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th title="转换顺序编号">序号</th>
+                                            <th title="原始输入的坐标值">输入</th>
+                                            <th title="格式转换后的结果">结果</th>
+                                            <th>状态</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="latLngResultsTable">
+                                        <!-- 结果将通过JavaScript动态填充 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -266,6 +424,340 @@
         document.getElementById('clearLogBtn').addEventListener('click', () => {
             document.getElementById('logContent').innerHTML = '';
             addLog('日志已清空');
+        });
+
+        // 经纬度转换工具类
+        class LatLngConverter {
+            // 十进制转度分秒
+            static decimalToDms(decimal, isLatitude = true, includeDirection = false) {
+                const isPositive = decimal >= 0;
+                const absDecimal = Math.abs(decimal);
+                
+                const degrees = Math.floor(absDecimal);
+                const minutesDecimal = (absDecimal - degrees) * 60;
+                const minutes = Math.floor(minutesDecimal);
+                const seconds = (minutesDecimal - minutes) * 60;
+                
+                const direction = isLatitude ? (isPositive ? 'N' : 'S') : (isPositive ? 'E' : 'W');
+                
+                return {
+                    degrees,
+                    minutes,
+                    seconds: parseFloat(seconds.toFixed(6)),
+                    direction,
+                    formatted: includeDirection ? `${degrees}°${minutes}'${seconds.toFixed(4)}"${direction}` : `${degrees}°${minutes}'${seconds.toFixed(4)}"`
+                };
+            }
+            
+            // 度分秒转压矿格式（如35°30'40.2516" → 35.30402516）
+            static dmsToMiningFormat(dmsString, isLatitude = true) {
+                try {
+                    // 先转换为十进制，指定是否为纬度
+                    const decimal = LatLngConverter.dmsToDecimal(dmsString, isLatitude);
+                    // 提取度分秒
+                    const dms = LatLngConverter.decimalToDms(Math.abs(decimal));
+                    // 格式化为度.分分秒秒
+                    const miningFormat = `${dms.degrees}.${String(dms.minutes).padStart(2, '0')}${String(Math.floor(dms.seconds)).padStart(2, '0')}${String(dms.seconds).split('.')[1] || '0000'}`;
+                    return miningFormat;
+                } catch (error) {
+                    throw new Error('无法转换为压矿格式');
+                }
+            }
+            
+            // 度分秒转十进制
+            static dmsToDecimal(dmsString, isLatitude = true) {
+                // 支持多种格式：39°54′15.12″N, 39°54'15.12"N, 39 54 15.12 N, 39°54.252'N
+                const dmsRegex = /^\s*([+-]?\d+(?:\.\d+)?)\s*[°dD]\s*([+-]?\d+(?:\.\d+)?)\s*['mM]\s*([+-]?\d+(?:\.\d+)?)?\s*["sS]?\s*([NSEWnsew]?)\s*$/;
+                const dmsWithSecondsRegex = /^\s*([+-]?\d+(?:\.\d+)?)\s*[°dD]\s*([+-]?\d+(?:\.\d+)?)\s*['mM]?\s*([+-]?\d+(?:\.\d+)?)?\s*["sS]?\s*([NSEWnsew]?)\s*$/;
+                
+                let match = dmsString.match(dmsRegex);
+                if (!match) {
+                    match = dmsString.match(dmsWithSecondsRegex);
+                }
+                
+                if (!match) {
+                    throw new Error('无法解析度分秒格式');
+                }
+                
+                let [, degrees, minutes, seconds, direction] = match;
+                
+                // 如果没有秒，分钟可能包含小数部分
+                if (!seconds) {
+                    seconds = 0;
+                } else {
+                    seconds = parseFloat(seconds);
+                }
+                
+                degrees = parseFloat(degrees);
+                minutes = parseFloat(minutes);
+                
+                let decimal = Math.abs(degrees) + minutes / 60 + seconds / 3600;
+                
+                // 处理方向
+                if (direction) {
+                    direction = direction.toUpperCase();
+                    if ((direction === 'S' || direction === 'W') && degrees >= 0) {
+                        decimal = -decimal;
+                    } else if ((direction === 'N' || direction === 'E') && degrees < 0) {
+                        decimal = Math.abs(decimal);
+                    }
+                }
+                
+                // 验证范围
+                if (isLatitude) {
+                    if (Math.abs(decimal) > 90) {
+                        throw new Error('纬度超出范围（-90° 到 90°）');
+                    }
+                } else {
+                    if (Math.abs(decimal) > 180) {
+                        throw new Error('经度超出范围（-180° 到 180°）');
+                    }
+                }
+                
+                return decimal;
+            }
+        }
+        
+        // 经纬度转换功能
+        document.addEventListener('DOMContentLoaded', () => {
+            // 单点转换事件
+            document.getElementById('singleConvertBtn').addEventListener('click', () => {
+                const lngInput = document.getElementById('lngInput').value.trim();
+                const latInput = document.getElementById('latInput').value.trim();
+                const conversionType = document.querySelector('input[name="latlngConversionType"]:checked').value;
+                
+                if (!latInput || !lngInput) {
+                    alert('请输入经度和纬度');
+                    return;
+                }
+                
+                try {
+                    let latResult, lngResult;
+                    
+                    if (conversionType === 'decimalToDms') {
+                        // 十进制转度分秒
+                        const lngDecimal = parseFloat(lngInput);
+                        const latDecimal = parseFloat(latInput);
+                        
+                        if (isNaN(lngDecimal) || isNaN(latDecimal)) {
+                            throw new Error('请输入有效的十进制数字');
+                        }
+                        
+                        const lngDms = LatLngConverter.decimalToDms(lngDecimal, false, false);
+                        const latDms = LatLngConverter.decimalToDms(latDecimal, true, false);
+                        
+                        lngResult = lngDms.formatted;
+                        latResult = latDms.formatted;
+                        
+                        addLog(`🔄 单点转换完成：${lngInput}, ${latInput} → ${lngResult}, ${latResult}`);
+                    } else if (conversionType === 'dmsToMining') {
+                                // 度分秒转压矿格式
+                                const lngMining = LatLngConverter.dmsToMiningFormat(lngInput, false);
+                                const latMining = LatLngConverter.dmsToMiningFormat(latInput, true);
+                                
+                                lngResult = lngMining;
+                                latResult = latMining;
+                        
+                        addLog(`🔄 单点转换完成：${lngInput}, ${latInput} → ${lngResult}, ${latResult}`);
+                    } else {
+                        // 度分秒转十进制
+                        const lngDecimal = LatLngConverter.dmsToDecimal(lngInput, false);
+                        const latDecimal = LatLngConverter.dmsToDecimal(latInput, true);
+                        
+                        lngResult = lngDecimal.toFixed(6);
+                        latResult = latDecimal.toFixed(6);
+                        
+                        addLog(`🔄 单点转换完成：${lngInput}, ${latInput} → ${lngResult}, ${latResult}`);
+                    }
+                    
+                    // 显示结果
+                    document.getElementById('lngResult').value = lngResult;
+                    document.getElementById('latResult').value = latResult;
+                    
+                } catch (error) {
+                    alert(`转换失败：${error.message}`);
+                    addLog(`❌ 单点转换失败：${error.message}`);
+                }
+            });
+            
+            // 清空单点转换
+            document.getElementById('clearSingleBtn').addEventListener('click', () => {
+                document.getElementById('latInput').value = '';
+                document.getElementById('lngInput').value = '';
+                document.getElementById('latResult').value = '';
+                document.getElementById('lngResult').value = '';
+            });
+            
+            // 复制结果
+            document.getElementById('copyResultBtn').addEventListener('click', () => {
+                const lngResult = document.getElementById('lngResult').value;
+                const latResult = document.getElementById('latResult').value;
+                
+                if (!latResult || !lngResult) {
+                    alert('没有可复制的结果');
+                    return;
+                }
+                
+                const textToCopy = `${lngResult}, ${latResult}`;
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    addLog('📋 转换结果已复制到剪贴板');
+                    // 显示临时提示
+                    const btn = document.getElementById('copyResultBtn');
+                    const originalText = btn.textContent;
+                    btn.textContent = '已复制！';
+                    btn.classList.remove('btn-success');
+                    btn.classList.add('btn-primary');
+                    
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('btn-success');
+                    }, 2000);
+                }).catch(err => {
+                    alert('复制失败：' + err);
+                });
+            });
+            
+            // 批量转换
+            document.getElementById('batchLatLngConvertBtn').addEventListener('click', () => {
+                const batchInput = document.getElementById('batchLatLngInput').value.trim();
+                const conversionType = document.querySelector('input[name="latlngConversionType"]:checked').value;
+                
+                if (!batchInput) {
+                    alert('请输入批量转换数据');
+                    return;
+                }
+                
+                const lines = batchInput.split('\n').filter(line => line.trim());
+                const results = [];
+                
+                lines.forEach((line, index) => {
+                    try {
+                        // 支持空格、逗号、制表符分隔
+                        const parts = line.trim().split(/[,\s\t]+/).filter(part => part.trim());
+                        if (parts.length < 2) {
+                            throw new Error('每行需包含经度和纬度');
+                        }
+                        
+                        const [lngInput, latInput] = parts;
+                        let latResult, lngResult;
+                        
+                        if (conversionType === 'decimalToDms') {
+                            // 十进制转度分秒
+                            const lngDecimal = parseFloat(lngInput);
+                            const latDecimal = parseFloat(latInput);
+                            
+                            if (isNaN(lngDecimal) || isNaN(latDecimal)) {
+                                throw new Error('请输入有效的十进制数字');
+                            }
+                            
+                            const lngDms = LatLngConverter.decimalToDms(lngDecimal, false, false);
+                            const latDms = LatLngConverter.decimalToDms(latDecimal, true, false);
+                            
+                            lngResult = lngDms.formatted;
+                            latResult = latDms.formatted;
+                        } else if (conversionType === 'dmsToMining') {
+                            // 度分秒转压矿格式
+                            const lngMining = LatLngConverter.dmsToMiningFormat(lngInput, false);
+                            const latMining = LatLngConverter.dmsToMiningFormat(latInput, true);
+                            
+                            lngResult = lngMining;
+                            latResult = latMining;
+                        } else {
+                            // 度分秒转十进制
+                            const lngDecimal = LatLngConverter.dmsToDecimal(lngInput, false);
+                            const latDecimal = LatLngConverter.dmsToDecimal(latInput, true);
+                            
+                            lngResult = lngDecimal.toFixed(6);
+                            latResult = latDecimal.toFixed(6);
+                        }
+                        
+                        results.push({
+                            index: index + 1,
+                            input: line.trim(),
+                            result: `${lngResult}, ${latResult}`,
+                            status: '成功'
+                        });
+                        
+                    } catch (error) {
+                        results.push({
+                            index: index + 1,
+                            input: line.trim(),
+                            result: '',
+                            status: '失败',
+                            error: error.message
+                        });
+                    }
+                });
+                
+                // 显示结果
+                const tableBody = document.getElementById('latLngResultsTable');
+                tableBody.innerHTML = '';
+                
+                results.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.index}</td>
+                        <td>${item.input}</td>
+                        <td>${item.result}</td>
+                        <td class="${item.status === '成功' ? 'text-success' : 'text-danger'}">
+                            ${item.status}${item.error ? `：${item.error}` : ''}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+                
+                // 启用导出按钮
+                document.getElementById('exportLatLngResultBtn').disabled = false;
+                
+                addLog(`📊 批量转换完成，共${lines.length}条，成功${results.filter(r => r.status === '成功').length}条`);
+            });
+            
+            // 清空批量转换
+            document.getElementById('clearBatchLatLngBtn').addEventListener('click', () => {
+                document.getElementById('batchLatLngInput').value = '';
+                document.getElementById('latLngResultsTable').innerHTML = '';
+                document.getElementById('exportLatLngResultBtn').disabled = true;
+            });
+            
+            // 导出批量结果
+            document.getElementById('exportLatLngResultBtn').addEventListener('click', () => {
+                const tableBody = document.getElementById('latLngResultsTable');
+                const rows = tableBody.querySelectorAll('tr');
+                
+                if (rows.length === 0) {
+                    alert('没有可导出的结果');
+                    return;
+                }
+                
+                // 创建CSV内容，添加UTF-8 BOM标记以解决Windows乱码问题
+                let csvContent = '\uFEFF序号,输入,结果,状态\n';
+                
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    const rowData = Array.from(cells).map(cell => {
+                        const text = cell.textContent.trim();
+                        // 如果包含逗号或换行符，使用引号包裹
+                        return text.includes(',') || text.includes('\n') ? `"${text.replace(/"/g, '""')}"` : text;
+                    });
+                    csvContent += rowData.join(',') + '\n';
+                });
+                
+                // 创建下载链接，指定UTF-8编码
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `经纬度转换结果_${new Date().getTime()}.csv`);
+                link.style.visibility = 'hidden';
+                
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                addLog(`📤 批量转换结果已导出为CSV文件`);
+            });
         });
 
         // 单点转换方向切换
@@ -322,6 +814,7 @@
 
             const bandType = document.getElementById('bandTypeSingle').value;
             const withBand = document.getElementById('withBandSingle').checked;
+            const decimalPlaces = parseInt(document.getElementById('decimalPlacesSingle').value);
 
             try {
                 addLog(`开始单点转换（方向：${sourceType === 'wgs84' ? 'WGS84→国家2000' : '国家2000→WGS84'}）`);
@@ -331,13 +824,14 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        sourceType,
-                        lonX,
-                        latY,
-                        bandType,
-                        withBand,
-                        bandNum  // 仅国家2000→WGS84时存在
-                    })
+                    sourceType,
+                    lonX,
+                    latY,
+                    bandType,
+                    withBand,
+                    bandNum,  // 仅国家2000→WGS84时存在
+                    decimalPlaces  // 新增：小数位参数
+                })
                 });
 
                 const result = await response.json();
@@ -421,12 +915,14 @@ WGS84纬度：${data.latitude.toFixed(6)} °N
 
             const bandType = document.getElementById('bandTypeBatch').value;
             const withBand = document.getElementById('withBandBatch').checked;
+            const decimalPlaces = document.getElementById('decimalPlacesBatch').value;
 
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
             formData.append('sourceType', batchSourceType);
             formData.append('bandType', bandType);
             formData.append('withBand', withBand);
+            formData.append('decimalPlaces', decimalPlaces);  // 新增：小数位参数
 
             try {
                 document.getElementById('batchStatus').textContent = '状态：正在处理...';

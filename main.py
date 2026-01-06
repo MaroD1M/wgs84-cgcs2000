@@ -135,7 +135,7 @@ def get_band_info(lon=None, band_type=None, with_band=None, band_num=None):
         return None, f"分带计算错误：{str(e)}"
 
 
-def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num=None):
+def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num=None, decimal_places=4):
     """
     坐标转换核心函数（支持双向转换）
     :param source_type: 源类型 - 'wgs84'（经纬度） 或 'cgcs2000'（高斯投影）
@@ -166,8 +166,8 @@ def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num
             x, y = transformer.transform(lat_y, lon_x)
 
             # 格式化结果
-            x = round(x, 3)
-            y = round(y, 3)
+            x = round(x, decimal_places)
+            y = round(y, decimal_places)
 
             return {
                 "type": "cgcs2000",
@@ -175,7 +175,7 @@ def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num
                 "y": y,
                 "band_num": band_info["band_num"],
                 "central_lon": band_info["central_lon"],
-                "combined": f"{x:.3f}, {y:.3f}"
+                "combined": f"{x:.{decimal_places}f}, {y:.{decimal_places}f}"
             }, None
 
         elif source_type == 'cgcs2000':
@@ -193,8 +193,8 @@ def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num
             lat, lon = transformer.transform(lon_x, lat_y)  # 注意：pyproj的transform顺序是（x, y）→（lat, lon）
 
             # 验证结果范围
-            lon = round(lon, 6)
-            lat = round(lat, 6)
+            lon = round(lon, decimal_places)
+            lat = round(lat, decimal_places)
             if lon < 72 or lon > 135:
                 return None, f"转换后的经度超出合理范围（{lon}）"
             if lat < 0 or lat > 54:
@@ -206,7 +206,7 @@ def convert_coordinate(source_type, lon_x, lat_y, band_type, with_band, band_num
                 "latitude": lat,
                 "band_num": band_info["band_num"],
                 "central_lon": band_info["central_lon"],
-                "combined": f"{lon:.6f}, {lat:.6f}"
+                "combined": f"{lon:.{decimal_places}f}, {lat:.{decimal_places}f}"
             }, None
 
         else:
@@ -230,7 +230,8 @@ def convert_single():
         lat_y=data['latY'],
         band_type="3" if data['bandType'] == "3°分带" else "6",
         with_band=data['withBand'],
-        band_num=data.get('bandNum')  # 可选参数，仅CGCS2000→WGS84时需要
+        band_num=data.get('bandNum'),  # 可选参数，仅CGCS2000→WGS84时需要
+        decimal_places=data.get('decimalPlaces', 4)  # 新增：小数位参数，默认4位
     )
 
     if error:
@@ -255,8 +256,8 @@ def export_template():
     else:
         # CGCS2000→WGS84模板（新增）
         template_data = pd.DataFrame({
-            "X坐标": [39535156.789, 38547321.987, 37532145.678],
-            "Y坐标": [3990923.123, 3123041.678, 2312911.000],
+            "X坐标": [3990923.123, 3123041.678, 2312911.000],
+            "Y坐标": [39535156.789, 38547321.987, 37532145.678],
             "带号": [39, 38, 37],
             "备注（可选）": ["北京示例点", "上海示例点", "广州示例点"]
         })
@@ -288,6 +289,8 @@ def export_template():
 
 @app.route('/convert_batch', methods=['POST'])
 def convert_batch():
+    # 获取小数位参数，默认4位
+    decimal_places = int(request.form.get('decimalPlaces', 4))
     if 'file' not in request.files:
         return jsonify({"status": "error", "message": "未上传文件"})
 
@@ -301,13 +304,17 @@ def convert_batch():
     with_band = request.form.get('withBand') == 'true'
 
     try:
-        # 读取文件
+        # 读取文件内容到BytesIO对象，解决SpooledTemporaryFile的seekable问题
+        import io
+        file_content = file.read()
+        file_stream = io.BytesIO(file_content)
+        
         if file.filename.endswith('.xlsx'):
-            df = pd.read_excel(file.stream, engine='openpyxl')
+            df = pd.read_excel(file_stream, engine='openpyxl')
         elif file.filename.endswith('.csv'):
-            df = pd.read_csv(file.stream, encoding='utf-8-sig')
+            df = pd.read_csv(file_stream, encoding='utf-8-sig')
         elif file.filename.endswith('.txt'):
-            df = pd.read_csv(file.stream, sep=',', encoding='utf-8-sig')
+            df = pd.read_csv(file_stream, sep=',', encoding='utf-8-sig')
         else:
             return jsonify({"status": "error", "message": "不支持的文件格式"})
 
@@ -334,7 +341,8 @@ def convert_batch():
                         lon_x=row['经度'],
                         lat_y=row['纬度'],
                         band_type=band_type,
-                        with_band=with_band
+                        with_band=with_band,
+                        decimal_places=decimal_places
                     )
                     note = row['备注（可选）'] if '备注（可选）' in df.columns else ''
                     input_info = f"{row['经度']}, {row['纬度']}"
@@ -347,7 +355,8 @@ def convert_batch():
                         lat_y=row['Y坐标'],
                         band_type=band_type,
                         with_band=with_band,
-                        band_num=row['带号']
+                        band_num=row['带号'],
+                        decimal_places=decimal_places
                     )
                     note = row['备注（可选）'] if '备注（可选）' in df.columns else ''
                     input_info = f"{row['X坐标']}, {row['Y坐标']}（带号：{row['带号']}）"
