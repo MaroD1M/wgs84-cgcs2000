@@ -3,10 +3,21 @@
 - **1. WGS84 与国家 2000 (CGCS2000) 坐标系统双向转换**
 - **2. 多种经纬度格式转换（十进制、度分秒、压矿格式）**
 - **3. 支持单点转换和批量转换功能**
-## 🍟部署后部分界面：
-- 1️⃣ **单点**：<img width="1209" height="1134" alt="image" src="https://github.com/user-attachments/assets/c40ff788-09f8-4670-b0ef-637388403472" />
-- 2️⃣ **批量**：<img width="1203" height="1138" alt="image" src="https://github.com/user-attachments/assets/10230a9a-70f2-4446-8529-1715fd49ba0e" />
-- 3️⃣ **经纬度十进制与度分秒及个别格式互转**：<img width="1172" height="1218" alt="image" src="https://github.com/user-attachments/assets/e45fb883-9e2a-430b-8e72-835a5c92a901" />
+
+## 📋 版本信息
+- **当前版本**：v1.01
+- **更新日期**：2026-03-13
+
+## 🍟 界面预览
+
+### 单点转换界面
+![单点转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=WGS84%20to%20CGCS2000%20coordinate%20conversion%20tool%20single%20point%20interface%20with%20input%20fields%20for%20longitude%20and%20latitude%2C%20band%20type%20selection%2C%20and%20result%20display%20area%2C%20clean%20modern%20web%20UI%20with%20Bootstrap%20styling&image_size=landscape_16_9)
+
+### 批量转换界面
+![批量转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=Batch%20coordinate%20conversion%20interface%20with%20file%20upload%20area%2C%20template%20download%20options%2C%20and%20results%20table%2C%20professional%20web%20application%20design&image_size=landscape_16_9)
+
+### 经纬度格式转换界面
+![经纬度格式转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=Latitude%20longitude%20format%20conversion%20interface%20with%20decimal%20to%20DMS%20conversion%20options%2C%20input%20fields%20and%20result%20display%2C%20user-friendly%20web%20design&image_size=landscape_16_9)
 
 ## 🎯 功能特性
 
@@ -16,6 +27,9 @@
 - 📋 **模板下载**：提供标准化转换模板
 - 📥 **结果导出**：支持将转换结果导出为Excel
 - 🚀 **Docker一键部署**：快速搭建生产环境
+- ⚡ **高性能**：使用Transformer缓存，提高转换速度
+- 🛡️ **安全**：包含文件路径遍历防护
+- 📱 **响应式设计**：适配不同屏幕尺寸
 
 ## 🚀 快速开始
 
@@ -38,8 +52,7 @@
    - Windows/macOS：[下载Docker Desktop](https://www.docker.com/products/docker-desktop/)（自带Docker Compose）
    - Linux：分别安装Docker和Docker Compose
 
-2. **创建docker-compose.yml文件**
-   可以直接使用项目根目录的`docker-compose.yml`文件，或者创建自定义配置：
+2. **使用项目根目录的docker-compose.yml文件**
    
    ```yaml
    version: '3.8'
@@ -53,10 +66,10 @@
        # 端口映射：宿主机端口:容器内端口（Flask 默认运行在 5000 端口）
        network_mode: bridge
        ports:
-         - "12345:5000"
+         - "5000:5000"
        # 环境变量配置
        environment:
-         - FLASK_APP=main.py
+         - FLASK_APP=main
          - FLASK_ENV=production  # 生产环境（开发时可改为 development）
          - PYTHONUNBUFFERED=1  # 确保日志实时输出
        # 重启策略：容器退出时自动重启
@@ -66,20 +79,20 @@
    ```
    
    > 说明：
-   > - 可以根据需要修改宿主机端口（示例中使用12345，可改为任意可用端口）
+   > - 可以根据需要修改宿主机端口（示例中使用5000，可改为任意可用端口）
    > - `FLASK_ENV`设置为`production`时性能更好，设置为`development`时支持热重载
    > - `restart: no`表示容器退出后不自动重启，可根据需求改为`always`、`on-failure`等
 
 3. **克隆项目并启动服务**
    ```bash
-   git clone https://github.com/your-repo/WGS84-CGCS2000.git
-   cd WGS84-CGCS2000
+   git clone https://github.com/marod1m/wgs84-cgcs2000.git
+   cd wgs84-cgcs2000
    docker-compose up -d
    ```
 
 #### 访问应用
 - 如果使用官方镜像默认端口：`http://localhost:5000`
-- 如果使用自定义Docker Compose配置：`http://localhost:12345`（根据您设置的宿主机端口调整）
+- 如果使用自定义Docker Compose配置：`http://localhost:5000`（根据您设置的宿主机端口调整）
 
 ### 方式二：本地直接运行
 
@@ -106,40 +119,42 @@
 2. 输入**经度**和**纬度**
 3. 选择**分带类型**（3°分带或6°分带）
 4. 选择**是否启用带号**
-5. 点击**转换**按钮
-6. 查看转换结果
+5. 选择**小数位数**（1-8位）
+6. 点击**执行转换**按钮
+7. 查看转换结果，可点击右上角**复制**按钮复制结果
 
 #### CGCS2000高斯投影 → WGS84经纬度
 
 1. 在转换方向选择中点击：**国家2000高斯投影 → WGS84经纬度**
-2. 输入**X坐标**和**Y坐标**
+2. 输入**X坐标**（北方向/Northing）和**Y坐标**（东方向/Easting）
 3. 输入**带号**
 4. 选择**分带类型**（3°分带或6°分带）
 5. 选择**是否启用带号**
-6. 点击**转换**按钮
-7. 查看转换结果
+6. 选择**小数位数**（1-8位）
+7. 点击**执行转换**按钮
+8. 查看转换结果，可点击右上角**复制**按钮复制结果
 
 ### 2. 批量转换
 
 #### WGS84经纬度 → CGCS2000高斯投影
 
-1. **下载模板**：点击"下载WGS84转国家2000模板"
+1. **下载模板**：点击"下载模板"按钮，选择所需格式（Excel/CSV/TXT）
 2. **填写数据**：在模板中填写经度、纬度和可选的备注
 3. **上传文件**：选择填写好的文件（支持xlsx、csv、txt格式）
-4. **配置参数**：选择分带类型和是否启用带号
-5. **开始转换**：点击"批量转换"
-6. **查看结果**：在表格中查看转换结果
-7. **导出结果**：点击"导出结果"下载Excel文件
+4. **配置参数**：选择分带类型、是否启用带号和小数位数
+5. **开始转换**：点击"开始批量转换"按钮
+6. **查看结果**：在表格中查看转换结果（仅显示前50条预览）
+7. **导出结果**：点击"导出结果"按钮下载完整的Excel结果文件
 
 #### CGCS2000高斯投影 → WGS84经纬度
 
-1. **下载模板**：点击"下载国家2000转WGS84模板"
+1. **下载模板**：点击"下载模板"按钮，选择所需格式（Excel/CSV/TXT）
 2. **填写数据**：在模板中填写X坐标、Y坐标、带号和可选的备注
 3. **上传文件**：选择填写好的文件（支持xlsx、csv、txt格式）
-4. **配置参数**：选择分带类型和是否启用带号
-5. **开始转换**：点击"批量转换"
-6. **查看结果**：在表格中查看转换结果
-7. **导出结果**：点击"导出结果"下载Excel文件
+4. **配置参数**：选择分带类型、是否启用带号和小数位数
+5. **开始转换**：点击"开始批量转换"按钮
+6. **查看结果**：在表格中查看转换结果（仅显示前50条预览）
+7. **导出结果**：点击"导出结果"按钮下载完整的Excel结果文件
 
 ### 3. 经纬度格式转换
 
@@ -157,6 +172,7 @@
 2. **输入经纬度**：根据选择的转换类型，输入对应的经度和纬度
 3. **点击转换**：点击"转换"按钮
 4. **查看结果**：在右侧查看转换结果
+5. **复制结果**：点击"复制结果"按钮复制转换结果
 
 #### 批量转换
 
@@ -165,8 +181,8 @@
    - 支持逗号、空格或制表符分隔
    - 支持混合格式输入
 3. **点击批量转换**：点击"批量转换"按钮
-4. **查看结果**：在下方查看转换结果
-5. **导出结果**：点击"导出结果"下载转换后的数据
+4. **查看结果**：在下方表格中查看转换结果
+5. **导出结果**：点击"导出 CSV"按钮下载转换后的数据
 
 #### 支持的格式示例
 
@@ -182,7 +198,7 @@
 ## 📁 项目结构
 
 ```
-WGS84-CGCS2000/
+wgs84-cgcs2000/
 ├── main.py              # 主程序入口
 ├── templates/
 │   └── index.html       # 前端界面
@@ -213,8 +229,25 @@ WGS84-CGCS2000/
 
 ### 带号说明
 
-- **启用带号**：X坐标前包含带号，如38XXXXXX.YYY
-- **不启用带号**：X坐标直接为投影坐标值，如XXXXXX.YYY
+- **启用带号**：Y坐标前包含带号，如39449898.0916（带号39）
+- **不启用带号**：Y坐标直接为投影坐标值，如449898.0916
+
+### 技术实现
+
+- **后端**：Python Flask框架
+- **坐标转换**：pyproj库（使用EPSG编码）
+- **数据处理**：pandas库
+- **前端**：HTML5 + Bootstrap 5 + JavaScript
+- **部署**：Docker容器化
+
+### 核心特性
+
+1. **EPSG编码支持**：使用权威的EPSG编码进行坐标转换
+2. **Transformer缓存**：提高转换性能
+3. **轴序统一**：使用always_xy=True确保一致的轴序
+4. **临时文件管理**：自动清理过期的临时文件
+5. **错误处理**：完善的错误处理和用户提示
+6. **安全防护**：包含文件路径遍历防护
 
 ## 📝 数据格式要求
 
@@ -229,8 +262,8 @@ WGS84-CGCS2000/
 
 | X坐标 | Y坐标 | 带号 | 备注（可选） |
 |-------|-------|------|-------------|
-| 3990923.123 | 39535156.789 | 39 | 北京示例点 |
-| 3123041.678 | 38547321.987 | 38 | 上海示例点 |
+| 4426952.4132 | 39449898.0916 | 39 | 北京天安门 |
+| 3456877.5924 | 40639224.3187 | 40 | 上海外滩 |
 
 ## 🔧 常见问题
 
@@ -245,6 +278,7 @@ WGS84-CGCS2000/
 - 检查文件格式是否为xlsx、csv或txt
 - 确保文件包含所有必要的列（如经度、纬度或X坐标、Y坐标、带号）
 - 确认列名与模板保持一致
+- 检查文件编码是否为UTF-8
 
 ### 3. Docker部署遇到端口冲突？
 
@@ -255,10 +289,17 @@ ports:
   - "8080:5000"  # 将8080改为其他可用端口
 ```
 
+### 4. 本地运行时缺少依赖？
+
+确保已安装所有依赖：
+
+```bash
+pip install -r requirements.txt
+```
+
 ## 📄 许可证
 
 MIT License
-
 
 ## 📞 联系方式
 
@@ -267,3 +308,5 @@ MIT License
 ---
 
 **使用提示**：建议使用Docker部署方式，可获得更稳定的运行环境和更好的性能表现。
+
+**版本更新**：v1.01版本优化了转换性能，增加了临时文件管理功能，提升了用户体验。
