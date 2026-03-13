@@ -8,16 +8,39 @@
 - **当前版本**：v1.01
 - **更新日期**：2026-03-13
 
-## 🍟 界面预览
+## 🍟 界面介绍
 
 ### 单点转换界面
-![单点转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=WGS84%20to%20CGCS2000%20coordinate%20conversion%20tool%20single%20point%20interface%20with%20input%20fields%20for%20longitude%20and%20latitude%2C%20band%20type%20selection%2C%20and%20result%20display%20area%2C%20clean%20modern%20web%20UI%20with%20Bootstrap%20styling&image_size=landscape_16_9)
+- **转换方向选择**：支持WGS84经纬度 → 国家2000高斯投影和国家2000高斯投影 → WGS84经纬度两种方向
+- **参数设置**：分带类型（3°分带或6°分带）、小数位数（1-8位）、是否启用带号
+- **输入区域**：根据转换方向显示不同的输入字段
+  - WGS84模式：经度、纬度输入框
+  - CGCS2000模式：X坐标（北方向）、Y坐标（东方向）、带号输入框
+- **结果显示**：转换结果以清晰的格式显示，包括带号、中央子午线、坐标值等信息
+- **操作按钮**：执行转换按钮和结果复制按钮
 
 ### 批量转换界面
-![批量转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=Batch%20coordinate%20conversion%20interface%20with%20file%20upload%20area%2C%20template%20download%20options%2C%20and%20results%20table%2C%20professional%20web%20application%20design&image_size=landscape_16_9)
+- **转换方向选择**：支持WGS84经纬度 → 国家2000高斯投影和国家2000高斯投影 → WGS84经纬度两种方向
+- **参数设置**：分带类型、小数位数、是否启用带号
+- **模板下载**：提供Excel、CSV、TXT三种格式的转换模板下载
+- **文件上传**：支持上传xlsx、csv、txt格式的文件
+- **操作按钮**：开始批量转换按钮和导出结果按钮
+- **结果显示**：以表格形式显示转换结果，包括输入数据、输出结果、状态和备注/错误信息
+- **结果统计**：显示转换总数、成功数和失败数
 
 ### 经纬度格式转换界面
-![经纬度格式转换界面](https://a0ai.marscode.cn/api/ide/v1/text_to_image?prompt=Latitude%20longitude%20format%20conversion%20interface%20with%20decimal%20to%20DMS%20conversion%20options%2C%20input%20fields%20and%20result%20display%2C%20user-friendly%20web%20design&image_size=landscape_16_9)
+- **转换类型选择**：支持十进制 → 度分秒、度分秒 → 十进制、度分秒 → 压矿格式三种转换类型
+- **单点转换**：输入框用于输入经纬度，转换结果实时显示
+- **批量转换**：文本区域用于输入多行数据，支持空格、逗号或制表符分隔
+- **结果显示**：以表格形式显示批量转换结果
+- **操作按钮**：转换按钮、清空按钮和导出CSV按钮
+
+### 整体界面特点
+- **响应式设计**：适配不同屏幕尺寸
+- **现代化UI**：使用Bootstrap 5框架，界面整洁美观
+- **操作日志**：底部显示操作日志，记录转换过程和结果
+- **错误提示**：提供清晰的错误提示信息
+- **用户友好**：操作流程简单直观，适合各种技术水平的用户
 
 ## 🎯 功能特性
 
