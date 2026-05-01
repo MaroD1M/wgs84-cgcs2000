@@ -10,6 +10,7 @@ import glob
 import tempfile
 
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
 
 # ============================================================
 # 权威 EPSG 编码配置
@@ -115,6 +116,8 @@ def _get_transformer(from_epsg: int, to_epsg: int) -> PyProjTransformer:
 # ============================================================
 TEMP_FILE_PREFIX = "coord_cvt_"
 TEMP_FILE_MAX_AGE = 3600  # 秒
+MAX_BATCH_ROWS = 20000
+ALLOWED_EXTENSIONS = {".xlsx", ".csv", ".txt"}
 
 
 def _cleanup_old_temp_files():
@@ -127,6 +130,24 @@ def _cleanup_old_temp_files():
                 os.unlink(fp)
         except OSError:
             pass
+
+
+def _get_band_type(raw: str) -> str:
+    return "3" if raw == "3°分带" else "6"
+
+
+def _normalize_source_type(source_type: str) -> str:
+    if source_type not in {"wgs84", "cgcs2000"}:
+        raise ValueError("sourceType 仅支持 wgs84 或 cgcs2000")
+    return source_type
+
+
+def _parse_decimal_places(raw_value, default: int = 4) -> int:
+    try:
+        value = int(raw_value if raw_value is not None else default)
+    except (TypeError, ValueError):
+        raise ValueError("decimalPlaces 必须是整数")
+    return max(0, min(value, 10))
 
 
 # ============================================================
@@ -293,13 +314,17 @@ def convert_single():
       WGS84  模式：lonX=经度,  latY=纬度
       CGCS模式：lonX=X(Northing), latY=Y(Easting), bandNum=带号
     """
-    data = request.get_json(force=True)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"status": "error", "message": "请求体必须为 JSON 对象"}), 400
 
-    source_type    = data.get("sourceType", "wgs84")
-    band_type_raw  = data.get("bandType", "3°分带")
-    band_type      = "3" if band_type_raw == "3°分带" else "6"
-    with_band      = bool(data.get("withBand", False))
-    decimal_places = max(0, min(int(data.get("decimalPlaces", 4)), 10))
+    try:
+        source_type = _normalize_source_type(data.get("sourceType", "wgs84"))
+        band_type = _get_band_type(data.get("bandType", "3°分带"))
+        with_band = bool(data.get("withBand", False))
+        decimal_places = _parse_decimal_places(data.get("decimalPlaces", 4))
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     result, error = convert_coordinate(
         source_type    = source_type,
@@ -319,8 +344,14 @@ def convert_single():
 @app.route("/export_template")
 def export_template():
     """下载空白导入模板"""
-    fmt         = request.args.get("type",   "xlsx")
+    fmt = request.args.get("type", "xlsx").strip().lower()
     source_type = request.args.get("source", "wgs84")
+    if fmt not in {"xlsx", "csv", "txt"}:
+        return jsonify({"status": "error", "message": "模板格式仅支持 xlsx/csv/txt"}), 400
+    try:
+        source_type = _normalize_source_type(source_type)
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     if source_type == "wgs84":
         df = pd.DataFrame({
@@ -365,7 +396,10 @@ def convert_batch():
     """批量转换接口"""
     _cleanup_old_temp_files()
 
-    decimal_places = max(0, min(int(request.form.get("decimalPlaces", 4)), 10))
+    try:
+        decimal_places = _parse_decimal_places(request.form.get("decimalPlaces", 4))
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
 
     if "file" not in request.files:
         return jsonify({"status": "error", "message": "未上传文件"})
@@ -373,28 +407,39 @@ def convert_batch():
     if not file.filename:
         return jsonify({"status": "error", "message": "未选择文件"})
 
-    source_type   = request.form.get("sourceType", "wgs84")
+    try:
+        source_type = _normalize_source_type(request.form.get("sourceType", "wgs84"))
+    except ValueError as e:
+        return jsonify({"status": "error", "message": str(e)}), 400
     band_type_raw = request.form.get("bandType", "3°分带")
-    band_type     = "3" if band_type_raw == "3°分带" else "6"
-    with_band     = request.form.get("withBand", "false").lower() == "true"
+    band_type = _get_band_type(band_type_raw)
+    with_band = request.form.get("withBand", "false").lower() == "true"
 
     try:
         # 读入内存，规避 SpooledTemporaryFile seekable 问题
-        raw  = file.read()
-        buf  = io.BytesIO(raw)
-        name = file.filename.lower()
-
-        if name.endswith(".xlsx"):
-            df = pd.read_excel(buf, engine="openpyxl")
-        elif name.endswith(".csv"):
-            df = pd.read_csv(buf, encoding="utf-8-sig")
-        elif name.endswith(".txt"):
-            df = pd.read_csv(buf, sep=",", encoding="utf-8-sig")
-        else:
+        raw = file.read()
+        if not raw:
+            return jsonify({"status": "error", "message": "上传文件为空"})
+        buf = io.BytesIO(raw)
+        name = file.filename.lower().strip()
+        ext = os.path.splitext(name)[1]
+        if ext not in ALLOWED_EXTENSIONS:
             return jsonify({"status": "error", "message": "不支持的文件格式，请上传 .xlsx / .csv / .txt"})
+
+        if ext == ".xlsx":
+            df = pd.read_excel(buf, engine="openpyxl")
+        elif ext == ".csv":
+            df = pd.read_csv(buf, encoding="utf-8-sig")
+        elif ext == ".txt":
+            df = pd.read_csv(buf, sep=",", encoding="utf-8-sig")
 
         if df.empty:
             return jsonify({"status": "error", "message": "文件内容为空"})
+        if len(df) > MAX_BATCH_ROWS:
+            return jsonify({
+                "status": "error",
+                "message": f"单次最多支持 {MAX_BATCH_ROWS} 行，当前为 {len(df)} 行"
+            }), 400
 
         # 去除列名首尾空格
         df.columns = df.columns.str.strip()
@@ -575,4 +620,4 @@ def export_results(filename):
 # ============================================================
 if __name__ == "__main__":
     _cleanup_old_temp_files()
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=False)
