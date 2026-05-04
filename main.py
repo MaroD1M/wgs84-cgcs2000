@@ -615,6 +615,12 @@ def export_results(filename):
         return jsonify({"status": "error", "message": f"导出失败: {e}"})
 
 
+@app.route("/healthz", methods=["GET"])
+def healthz():
+    """Container/runtime health probe endpoint."""
+    return jsonify({"status": "ok"}), 200
+
+
 # ============================================================
 # 启动
 # ============================================================

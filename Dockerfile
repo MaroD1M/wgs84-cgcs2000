@@ -1,24 +1,33 @@
-# 使用官方Python镜像作为基础（与本地开发环境保持一致）
 FROM python:3.10-slim
 
-# 安装系统依赖
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libproj-dev \
-    proj-data \
-    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# 设置工作目录
 WORKDIR /app
 
-# 安装setuptools（构建依赖）
-RUN pip install --no-cache-dir setuptools
+# Install only runtime packages required by pyproj.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libproj-dev \
+       proj-data \
+    && rm -rf /var/lib/apt/lists/*
 
-# 复制依赖文件并安装
-COPY requirements.txt .
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY main.py ./
+COPY templates ./templates
+
+# Run as an unprivileged user to reduce container breakout risk.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
+USER appuser
 
 EXPOSE 5000
 
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "main:app"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/healthz', timeout=3)"
+
+CMD ["gunicorn", "-w", "2", "-k", "gthread", "--threads", "4", "--timeout", "60", "-b", "0.0.0.0:5000", "main:app"]
