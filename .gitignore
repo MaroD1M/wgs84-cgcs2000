@@ -2,3 +2,14 @@
 __pycache__/
 .pytest_cache/
 *.pyc
+.env
+.env.*
+!.env.example
+*.local
+*.log
+.DS_Store
+.idea/
+.vscode/
+docker-compose.override.yml
+coverage/
+htmlcov/
