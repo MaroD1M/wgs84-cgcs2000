@@ -7,6 +7,10 @@
 - 📥 模板下载与结果导出
 - 🐳 Docker / 群晖 Container Manager 一键部署
 
+## 🖼️ 项目界面预览
+
+![WGS84 / CGCS2000 项目界面](docs/images/wgs84-cgcs2000-ui.png)
+
 ---
 
 ## 🚀 群晖用户快速开始（可视化部署）
@@ -144,4 +148,3 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt pytest
 .venv/bin/python -m pytest -q tests
 ```
-
