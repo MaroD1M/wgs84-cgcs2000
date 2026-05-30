@@ -1,7 +1,7 @@
 services:
   # 🌍 WGS84 / CGCS2000 坐标转换服务（群晖可视化部署推荐）
   coordinate-converter:
-    # 镜像版本：可先用 latest；如需固定可改成 v1.1.4
+    # 镜像版本：可先用 latest；如需固定可改成 v1.1.3
     image: ghcr.io/marod1m/wgs84-cgcs2000:${APP_VERSION:-latest}
 
     # 端口映射：左边是群晖/宿主机端口，右边 5000 不要改
