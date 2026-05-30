@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py ./
 COPY templates ./templates
+COPY static ./static
 
 # Run as an unprivileged user to reduce container breakout risk.
 RUN useradd --create-home --shell /usr/sbin/nologin appuser \
