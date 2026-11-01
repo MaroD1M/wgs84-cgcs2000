@@ -1,0 +1,2001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f5f7fa">
+    <title>WGS84 / CGCS2000 / GCJ02 / BD09 坐标转换工具</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/leaflet/leaflet.css') }}" rel="stylesheet">
+    <style>
+        body { padding: 20px; max-width: 1100px; margin: 0 auto; background: #f5f7fa; }
+        .card  { border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+        .tab-content { background: #fff; border: 1px solid #dee2e6; border-top: none;
+                       border-radius: 0 0 8px 8px; padding: 24px; }
+
+        /* 转换方向选择器 */
+        .dir-card { display:flex; gap:10px; margin-bottom:20px; }
+        .dir-btn  { flex:1; padding:12px 10px; border:2px solid #dee2e6; border-radius:8px;
+                    background:#fff; cursor:pointer; text-align:center; font-size:.9rem;
+                    transition:all .2s; user-select:none; }
+        .dir-btn:hover  { border-color:#0d6efd; color:#0d6efd; }
+        .dir-btn.active { border-color:#0d6efd; background:#e8f0fe; color:#0d6efd; font-weight:600; }
+
+        /* 结果框 */
+        .result-box { min-height:140px; padding:14px; border:1px solid #dee2e6;
+                      border-radius:6px; background:#f8fffe; font-family:monospace;
+                      white-space:pre-wrap; word-break:break-all; font-size:.9rem; }
+        .result-box.ok  { border-color:#198754; background:#f0fff4; }
+        .result-box.err { border-color:#dc3545; background:#fff5f5; color:#dc3545; }
+
+        /* 日志 */
+        .log-area { margin-top:24px; padding:14px; border:1px solid #dee2e6;
+                    border-radius:8px; max-height:200px; overflow-y:auto;
+                    background:#1e2433; color:#c9d1d9; font-family:monospace; font-size:.8rem; }
+        .log-area .log-ok   { color:#56d364; }
+        .log-area .log-err  { color:#f85149; }
+        .log-area .log-info { color:#79c0ff; }
+        .log-area .log-time { color:#8b949e; margin-right:6px; }
+
+        /* 状态徽章 */
+        .badge-ok   { color:#198754; font-weight:600; }
+        .badge-fail { color:#dc3545; font-weight:600; }
+
+        /* 表格容器 */
+        .tbl-wrap { max-height:400px; overflow:auto; -webkit-overflow-scrolling:touch; }
+        .tbl-wrap table { min-width:640px; }
+
+        /* DMS 方向按钮组 */
+        .dms-mode { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap; }
+        .dms-mode .dir-btn { font-size:.82rem; padding:8px 10px; }
+
+        /* 在线地图预览 */
+        .map-box { height: 340px; border:1px solid #dee2e6; border-radius:8px;
+                   margin-top:12px; background:#e9ecef; z-index:0; }
+        .map-legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:6px;
+                      font-size:.78rem; color:#495057; }
+        .legend-dot { display:inline-block; width:10px; height:10px; border-radius:50%;
+                      margin-right:4px; vertical-align:middle; }
+        .legend-dot.src { background:#0d6efd; }
+        .legend-dot.dst { background:#dc3545; }
+        .legend-dot.raw { background:#fd7e14; }
+        .map-hint { font-size:.78rem; }
+        .map-hint-row { display:flex; align-items:flex-start; gap:10px; margin-top:-2px; }
+        .map-hint-row .map-hint { flex:1 1 auto; }
+        .map-settings-btn { flex:0 0 auto; }
+        .map-warning { margin-top:10px; padding:10px 12px; border:1px solid #dc3545;
+                       border-radius:8px; background:#fff5f5; color:#842029;
+                       font-size:.8rem; line-height:1.45; }
+        .map-warning-actions { display:flex; gap:8px; margin-top:8px; }
+        .map-settings-offcanvas { width:380px; }
+        .map-settings-status { font-size:.82rem; }
+        .map-settings-help { font-size:.78rem; color:#6c757d; }
+
+        @media (max-width: 767.98px) {
+            body { padding:12px; }
+            .tab-content { padding:16px; }
+            .map-box { height:260px; }
+            .tbl-wrap { max-height:340px; }
+            .log-area { max-height:150px; }
+            .map-legend { gap:10px; }
+        }
+    </style>
+    <link href="{{ url_for('static', filename='css/mobile.css') }}" rel="stylesheet">
+</head>
+<body>
+
+<h2 class="text-center mb-2 fw-bold app-title">🌐 坐标转换工具</h2>
+<p class="text-center text-muted mb-4 app-subtitle">
+    WGS84 / CGCS2000 / GCJ02（火星）/ BD09（百度）&nbsp;·&nbsp; 单点 / 批量 &nbsp;·&nbsp; 经纬度格式互转 &nbsp;·&nbsp; 在线地图校验
+</p>
+
+<!-- ══════════════════════════════════════════════════════
+     标签页
+══════════════════════════════════════════════════════ -->
+<ul class="nav nav-tabs" id="mainTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" type="button" role="tab" data-bs-toggle="tab"
+                data-bs-target="#tab-single" aria-controls="tab-single" aria-selected="true">
+            <span class="tab-full">单点转换（常用）</span><span class="tab-short">单点转换</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" type="button" role="tab" data-bs-toggle="tab"
+                data-bs-target="#tab-batch" aria-controls="tab-batch" aria-selected="false">
+            <span class="tab-full">批量转换</span><span class="tab-short">批量转换</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" type="button" role="tab" data-bs-toggle="tab"
+                data-bs-target="#tab-dms" aria-controls="tab-dms" aria-selected="false">
+            <span class="tab-full">经纬度格式转换</span><span class="tab-short">格式转换</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="mainTabsContent">
+
+    <!-- ══════════════════════
+         单点转换
+    ══════════════════════ -->
+    <div class="tab-pane fade show active" id="tab-single">
+
+        <!-- 坐标系选择 -->
+        <div class="row g-3 mb-3 crs-row">
+            <div class="col-md-5 crs-source-col">
+                <label class="form-label fw-semibold" for="s-sourceType">源坐标系</label>
+                <select class="form-select" id="s-sourceType" onchange="onSingleSourceChange()">
+                    <option value="wgs84" selected>WGS84 经纬度</option>
+                    <option value="cgcs2000">CGCS2000 高斯投影（X/Y）</option>
+                    <option value="gcj02">GCJ02 火星坐标</option>
+                    <option value="bd09">BD09 百度坐标</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end justify-content-center pb-2 crs-swap-col">
+                <button type="button" class="btn btn-outline-secondary btn-sm swap-btn"
+                        onclick="swapSingleCrs()" title="交换源/目标坐标系（会清空输入和结果）"
+                        aria-label="交换源坐标系和目标坐标系">
+                    <span aria-hidden="true">⇄</span><span class="swap-text"> 交换</span>
+                </button>
+            </div>
+            <div class="col-md-5 crs-target-col">
+                <label class="form-label fw-semibold" for="s-targetType">目标坐标系</label>
+                <select class="form-select" id="s-targetType" onchange="onSingleTargetChange()">
+                    <option value="wgs84">WGS84 经纬度</option>
+                    <option value="cgcs2000" selected>CGCS2000 高斯投影（X/Y）</option>
+                    <option value="gcj02">GCJ02 火星坐标</option>
+                    <option value="bd09">BD09 百度坐标</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="alert alert-light border py-2 px-3 mb-3 map-hint" id="s-crs-note">
+            输入坐标将先统一换算为 WGS84，再转换为目标坐标系。
+        </div>
+
+        <div class="row g-4">
+            <!-- 左列：参数 + 输入 -->
+            <div class="col-md-6">
+
+                <!-- 公共配置 -->
+                <div class="row g-3 mb-3 single-config-row">
+                    <div class="col-6" id="s-band-type-col">
+                        <label class="form-label fw-semibold" for="s-bandType">分带类型</label>
+                        <select class="form-select form-select-sm" id="s-bandType" onchange="updateSingleSample()">
+                            <option value="3°分带" selected>3°分带（常用）</option>
+                            <option value="6°分带">6°分带</option>
+                        </select>
+                    </div>
+                    <div class="col-6" id="s-decimal-col">
+                        <label class="form-label fw-semibold" for="s-decimal">
+                            小数位数
+                            <span class="text-muted" title="转换结果保留的小数位数">ℹ️</span>
+                        </label>
+                        <select class="form-select form-select-sm" id="s-decimal">
+                            <option value="1">1位</option>
+                            <option value="2">2位</option>
+                            <option value="3">3位</option>
+                            <option value="4" selected>4位</option>
+                            <option value="5">5位</option>
+                            <option value="6">6位</option>
+                            <option value="7">7位</option>
+                            <option value="8">8位</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 带号选项：按源/目标是否为 CGCS2000 动态显示 -->
+                <div class="row g-3 mb-3" id="s-band-extra">
+                    <div class="col-md-4 d-none" id="s-source-band-opts">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="s-sourceWithBand"
+                                   checked onchange="updateSingleSample()">
+                            <label class="form-check-label" for="s-sourceWithBand"
+                                   title="源为 CGCS2000 时，Y 坐标是否带带号前缀">
+                                源 Y 含带号
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-none" id="s-target-band-opts">
+                        <div class="form-check mt-4">
+                            <input class="form-check-input" type="checkbox" id="s-targetWithBand" checked>
+                            <label class="form-check-label" for="s-targetWithBand"
+                                   title="目标为 CGCS2000 时，Y 坐标是否输出带号前缀">
+                                目标 Y 含带号
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-4 d-none" id="s-target-band-num-wrap">
+                        <label class="form-label fw-semibold" for="s-targetBandNum">
+                            目标固定带号
+                            <span class="text-muted" title="留空则按目标经度自动选带">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control form-control-sm" id="s-targetBandNum"
+                               step="1" inputmode="numeric" placeholder="留空自动选带">
+                        <div class="mobile-help d-md-none">留空时按每个点的经度自动选带。</div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="fillSingleSample()">
+                        填入示例
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearSingleInputs()">
+                        清空输入
+                    </button>
+                </div>
+
+                <!-- 经纬度输入（WGS84 / GCJ02 / BD09） -->
+                <div id="s-geo-inputs">
+                    <div class="mb-3">
+                        <label class="form-label" id="s-lon-label" for="s-lon">
+                            经度（°E）
+                            <span class="text-muted" title="中国范围约 73°~136°">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control" id="s-lon" step="any"
+                               inputmode="decimal" enterkeyhint="next"
+                               placeholder="示例：116.397428（北京天安门）">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" id="s-lat-label" for="s-lat">
+                            纬度（°N）
+                            <span class="text-muted" title="中国范围约 18°~54°">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control" id="s-lat" step="any"
+                               inputmode="decimal" enterkeyhint="go"
+                               placeholder="示例：39.909230（北京天安门）">
+                    </div>
+                </div>
+
+                <!-- CGCS2000 输入
+                     ⚠ 中国测绘惯例：X = Northing（北方向）, Y = Easting（东方向）
+                       含带号时 Y 数值较大（如 39448475），X 数值约 0~6,000,000
+                -->
+                <div id="s-cgcs-inputs" class="d-none">
+                    <div class="mb-3">
+                        <label class="form-label" for="s-cgcsX">
+                            X 坐标（北方向 / Northing，米）
+                            <span class="text-muted"
+                                  title="中国测绘惯例：X为北方向，数值约在100万~600万之间">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control" id="s-cgcsX" step="any"
+                               inputmode="decimal" enterkeyhint="next"
+                               placeholder="示例：4419624.3249（北京天安门）">
+                        <div class="mobile-help d-md-none">X = 北方向 Northing，数值通常在 100 万～600 万之间。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="s-cgcsY">
+                            Y 坐标（东方向 / Easting，米）
+                            <span class="text-muted"
+                                  title="含带号时数值较大，如39448475（带号39+Easting）；不含带号时约在0~1,000,000之间">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control" id="s-cgcsY" step="any"
+                               inputmode="decimal" enterkeyhint="next"
+                               placeholder="示例：39448475.8151（北京，3°分带39，含带号）">
+                        <div class="mobile-help d-md-none">Y = 东方向 Easting；含带号时约为 8 位数字。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="s-bandNum">
+                            带号（必填）
+                            <span class="text-muted"
+                                  title="3°分带范围 25~45；6°分带范围 13~23">ℹ️</span>
+                        </label>
+                        <input type="number" class="form-control" id="s-bandNum" step="1"
+                               inputmode="numeric" enterkeyhint="go"
+                               placeholder="示例：39（北京天安门所在带）">
+                        <div class="mobile-help d-md-none">3°分带范围 25～45；6°分带范围 13～23。</div>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary w-100" id="s-convert-btn" onclick="doSingleConvert()">
+                    执行转换
+                </button>
+            </div>
+
+            <!-- 右列：结果 -->
+            <div class="col-md-6">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0 fw-semibold">转换结果</h6>
+                    <button class="btn btn-sm btn-outline-secondary" id="s-copy-btn"
+                            onclick="copySingleResult(this)" aria-label="复制转换结果" disabled>
+                        📋 复制
+                    </button>
+                </div>
+                <div class="result-box" id="s-result" role="status" aria-live="polite">等待转换...</div>
+                <p class="text-muted mt-2 result-help">
+                    ✅ 点击右上角按钮一键复制 &nbsp;|&nbsp; 📌 X=北方向(Northing) · Y=东方向(Easting)
+                </p>
+
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="s-mapEnabled"
+                           onchange="refreshSingleMap()">
+                    <label class="form-check-label" for="s-mapEnabled">
+                        🗺️ 在地图上预览转换结果
+                    </label>
+                </div>
+                <div class="map-hint-row">
+                    <div class="form-text map-hint" id="s-mapHint">正在读取地图配置...</div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary map-settings-btn"
+                            onclick="showMapSettings()">地图设置</button>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="s-mapRaw"
+                           onchange="refreshSingleMap()">
+                    <label class="form-check-label" for="s-mapRaw"
+                           title="仅对经纬度类型有效；投影 X/Y 不适用">
+                        显示原始数值直接落图（观察 GCJ02/BD09 偏移）
+                    </label>
+                </div>
+                <div id="s-map" class="map-box d-none"></div>
+                <div class="map-warning d-none" id="s-map-warning" role="alert">
+                    <div id="s-map-warning-text">天地图瓦片加载失败，请检查 Key、域名白名单或网络连接。</div>
+                    <div class="map-warning-actions">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="showMapSettings()">地图设置</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="retryMaps()">重试</button>
+                    </div>
+                </div>
+                <div class="map-legend d-none" id="s-map-legend">
+                    <span><span class="legend-dot src"></span>源坐标（校正后）</span>
+                    <span><span class="legend-dot dst"></span>目标坐标（校正后）</span>
+                    <span><span class="legend-dot raw"></span>原始数值（未校正）</span>
+                    <span class="text-muted">校正后源/目标应重合；勾选“显示原始数值”可观察 GCJ02/BD09 偏移。</span>
+                </div>
+            </div>
+        </div>
+    </div><!-- /tab-single -->
+
+
+    <!-- ══════════════════════
+         批量转换
+    ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-batch">
+
+        <!-- 坐标系选择 -->
+        <div class="row g-3 mb-3 crs-row">
+            <div class="col-md-5 crs-source-col">
+                <label class="form-label fw-semibold" for="b-sourceType">源坐标系</label>
+                <select class="form-select" id="b-sourceType" onchange="onBatchSourceChange()">
+                    <option value="wgs84" selected>WGS84 经纬度</option>
+                    <option value="cgcs2000">CGCS2000 高斯投影（X/Y）</option>
+                    <option value="gcj02">GCJ02 火星坐标</option>
+                    <option value="bd09">BD09 百度坐标</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end justify-content-center pb-2 crs-swap-col">
+                <button type="button" class="btn btn-outline-secondary btn-sm swap-btn"
+                        onclick="swapBatchCrs()" title="交换源/目标坐标系（会清空文件与结果）"
+                        aria-label="交换批量转换的源坐标系和目标坐标系">
+                    <span aria-hidden="true">⇄</span><span class="swap-text"> 交换</span>
+                </button>
+            </div>
+            <div class="col-md-5 crs-target-col">
+                <label class="form-label fw-semibold" for="b-targetType">目标坐标系</label>
+                <select class="form-select" id="b-targetType" onchange="onBatchTargetChange()">
+                    <option value="wgs84">WGS84 经纬度</option>
+                    <option value="cgcs2000" selected>CGCS2000 高斯投影（X/Y）</option>
+                    <option value="gcj02">GCJ02 火星坐标</option>
+                    <option value="bd09">BD09 百度坐标</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 配置行 -->
+        <div class="row g-3 mb-3 batch-config-row">
+            <div class="col-md-3" id="b-band-type-col">
+                <label class="form-label fw-semibold" for="b-bandType">分带类型</label>
+                <select class="form-select form-select-sm" id="b-bandType">
+                    <option value="3°分带" selected>3°分带（常用）</option>
+                    <option value="6°分带">6°分带</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="b-decimal-col">
+                <label class="form-label fw-semibold" for="b-decimal">小数位数</label>
+                <select class="form-select form-select-sm" id="b-decimal">
+                    <option value="1">1位</option>
+                    <option value="2">2位</option>
+                    <option value="3">3位</option>
+                    <option value="4" selected>4位</option>
+                    <option value="5">5位</option>
+                    <option value="6">6位</option>
+                    <option value="7">7位</option>
+                    <option value="8">8位</option>
+                </select>
+            </div>
+            <div class="col-md-3 d-none" id="b-source-band-col">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="b-sourceWithBand" checked>
+                    <label class="form-check-label" for="b-sourceWithBand">源 Y 含带号</label>
+                </div>
+            </div>
+            <div class="col-md-3 d-none" id="b-target-band-col">
+                <div class="form-check mt-4">
+                    <input class="form-check-input" type="checkbox" id="b-targetWithBand" checked>
+                    <label class="form-check-label" for="b-targetWithBand">目标 Y 含带号</label>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-3 batch-template-row">
+            <div class="col-md-4 d-none" id="b-target-band-num-col">
+                <label class="form-label fw-semibold" for="b-targetBandNum">
+                    目标固定带号
+                    <span class="text-muted" title="留空则按每点经度自动选带；固定带号适合统一分带成果">ℹ️</span>
+                </label>
+                <input type="number" class="form-control form-control-sm" id="b-targetBandNum"
+                       step="1" inputmode="numeric" placeholder="留空自动选带">
+                <div class="mobile-help d-md-none">留空时按每个点的经度自动选带。</div>
+            </div>
+            <div class="col-md-8 d-flex align-items-end gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="downloadTemplate()">
+                    ⬇ 下载模板
+                </button>
+                <select class="form-select form-select-sm" id="b-tmplType" style="width:90px;">
+                    <option value="xlsx">Excel</option>
+                    <option value="csv">CSV</option>
+                    <option value="txt">TXT</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 模板提示 -->
+        <div class="alert alert-info py-2 px-3 mb-3" id="b-tmpl-hint" style="font-size:.85rem;">
+            📄 <strong>WGS84模板</strong>：需包含 <code>经度</code>、<code>纬度</code> 列
+        </div>
+
+        <!-- 文件上传 -->
+        <div class="mb-3">
+            <label class="form-label fw-semibold" for="b-fileInput">选择数据文件</label>
+            <input type="file" class="form-control" id="b-fileInput"
+                   accept=".xlsx,.csv,.txt" onchange="onFileSelected(this)">
+            <div class="form-text" id="b-fileHint">
+                支持 .xlsx / .csv / .txt，WGS84 模式需含“经度”/“纬度”列
+            </div>
+        </div>
+
+        <!-- 状态 + 操作按钮 -->
+        <div class="d-flex align-items-center gap-3 mb-3 batch-actions">
+            <button class="btn btn-primary" id="b-startBtn"
+                    onclick="doBatchConvert()" disabled>
+                开始批量转换
+            </button>
+            <button class="btn btn-success d-none" id="b-exportBtn"
+                    onclick="exportBatchResult()">
+                ⬇ 导出结果
+            </button>
+            <button class="btn btn-outline-secondary" id="b-clearBtn"
+                    onclick="clearBatchForm()">
+                清空
+            </button>
+            <span class="text-muted" id="b-status" role="status" aria-live="polite">状态：未选择文件</span>
+        </div>
+
+        <!-- 结果统计 -->
+        <div class="alert alert-secondary py-2 px-3 d-none mb-2" id="b-summary" role="status" aria-live="polite" style="font-size:.85rem;"></div>
+
+        <!-- 地图预览（前50条） -->
+        <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" id="b-mapEnabled"
+                   onchange="refreshBatchMap()">
+            <label class="form-check-label" for="b-mapEnabled">
+                🗺️ 在地图上预览成功结果（前50条）
+            </label>
+        </div>
+        <div class="map-hint-row">
+            <div class="form-text map-hint" id="b-mapHint">正在读取地图配置...</div>
+            <button type="button" class="btn btn-sm btn-outline-secondary map-settings-btn"
+                    onclick="showMapSettings()">地图设置</button>
+        </div>
+        <div id="b-map" class="map-box d-none"></div>
+        <div class="map-warning d-none" id="b-map-warning" role="alert">
+            <div id="b-map-warning-text">天地图瓦片加载失败，请检查 Key、域名白名单或网络连接。</div>
+            <div class="map-warning-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger" onclick="showMapSettings()">地图设置</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="retryMaps()">重试</button>
+            </div>
+        </div>
+        <div class="map-legend d-none" id="b-map-legend">
+            <span><span class="legend-dot src"></span>源位置</span>
+            <span><span class="legend-dot dst"></span>目标位置</span>
+            <span class="text-muted">仅显示前 50 条成功结果；蓝=源，红=目标。</span>
+        </div>
+
+        <!-- 结果预览表 -->
+        <div class="tbl-wrap">
+            <table class="table table-sm table-striped table-hover mb-0 mobile-card-table batch-card-table">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width:50px;">序号</th>
+                        <th>输入数据</th>
+                        <th>输出结果</th>
+                        <th style="width:70px;">状态</th>
+                        <th>备注 / 错误</th>
+                    </tr>
+                </thead>
+                <tbody id="b-tbody"></tbody>
+            </table>
+        </div>
+
+    </div><!-- /tab-batch -->
+
+
+    <!-- ══════════════════════
+         经纬度格式转换
+    ══════════════════════ -->
+    <div class="tab-pane fade" id="tab-dms">
+        <p class="text-muted mb-3">支持十进制格式与度分秒格式之间的相互转换</p>
+
+        <!-- 模式选择 -->
+        <div class="dms-mode" id="dms-mode-btns">
+            <div class="dir-btn active" onclick="setDmsMode('dec2dms')">十进制 → 度分秒</div>
+            <div class="dir-btn"       onclick="setDmsMode('dms2dec')">度分秒 → 十进制</div>
+            <div class="dir-btn"       onclick="setDmsMode('dms2mining')">
+                度分秒 → 压矿格式
+                <small class="d-block text-muted" style="font-size:.72rem;">
+                    如 35°30'40.2516" → 35.30402516
+                </small>
+            </div>
+        </div>
+
+        <!-- 单点转换 -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">单点转换</h6>
+                <div class="row g-3">
+                    <div class="col-md-5">
+                        <div class="mb-3">
+                            <label class="form-label" id="dms-lon-lbl" for="dms-lon">经度（十进制）</label>
+                            <input type="text" class="form-control" id="dms-lon"
+                                   placeholder="如 116.397428">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" id="dms-lat-lbl" for="dms-lat">纬度（十进制）</label>
+                            <input type="text" class="form-control" id="dms-lat"
+                                   placeholder="如 39.909230">
+                        </div>
+                        <div class="d-flex gap-2 dms-single-actions">
+                            <button class="btn btn-primary" onclick="doDmsSingle()">转换</button>
+                            <button class="btn btn-outline-secondary" onclick="clearDmsSingle()">清空</button>
+                        </div>
+                    </div>
+                    <div class="col-md-5 offset-md-2">
+                        <label class="form-label fw-semibold">转换结果</label>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">经度</span>
+                            <input type="text" class="form-control" id="dms-lon-res" readonly>
+                        </div>
+                        <div class="input-group mb-3">
+                            <span class="input-group-text">纬度</span>
+                            <input type="text" class="form-control" id="dms-lat-res" readonly>
+                        </div>
+                        <button class="btn btn-success" id="dms-copy-btn"
+                                onclick="copyDmsSingle(this)" aria-label="复制经纬度格式转换结果" disabled>📋 复制结果</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 批量转换 -->
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-semibold mb-3">批量转换</h6>
+                <div class="mb-3">
+                    <label class="form-label" for="dms-batch-input">
+                        批量输入
+                        <span class="text-muted" id="dms-batch-hint">
+                            — 每行一组，<strong>经度在前、纬度在后</strong>，空格/逗号/Tab 分隔
+                        </span>
+                    </label>
+                    <textarea class="form-control font-monospace" id="dms-batch-input"
+                              rows="5"
+                              placeholder="116.397428 39.909230&#10;121.473701 31.230416&#10;113.264385 23.129110"></textarea>
+                </div>
+                <div class="d-flex gap-2 mb-3 dms-batch-actions">
+                    <button class="btn btn-primary"          onclick="doDmsBatch()">批量转换</button>
+                    <button class="btn btn-outline-secondary" onclick="clearDmsBatch()">清空</button>
+                    <button class="btn btn-success"          id="dms-export-btn"
+                            onclick="exportDmsResult()" disabled>⬇ 导出 CSV</button>
+                </div>
+                <div class="tbl-wrap">
+                    <table class="table table-sm table-striped table-hover mb-0 mobile-card-table dms-card-table">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th style="width:50px;">序号</th>
+                                <th>输入</th>
+                                <th>结果</th>
+                                <th style="width:60px;">状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dms-batch-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /tab-dms -->
+
+</div><!-- /tab-content -->
+
+
+<!-- ══════════════════════════════════════════════════════
+     操作日志
+══════════════════════════════════════════════════════ -->
+<div class="d-flex justify-content-between align-items-center mt-4 mb-1 log-header">
+    <small class="text-muted fw-semibold">操作日志</small>
+    <div class="d-flex gap-2">
+        <button class="btn btn-sm btn-outline-secondary d-md-none" type="button"
+                id="log-toggle" aria-controls="log-box" aria-expanded="true">收起日志</button>
+        <button class="btn btn-sm btn-outline-secondary" type="button" onclick="clearLog()">清空日志</button>
+    </div>
+</div>
+<div class="log-area" id="log-box"></div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     地图设置
+══════════════════════════════════════════════════════ -->
+<div class="offcanvas offcanvas-end map-settings-offcanvas" tabindex="-1"
+     id="mapSettings" aria-labelledby="mapSettingsLabel">
+    <div class="offcanvas-header">
+        <h5 class="offcanvas-title" id="mapSettingsLabel">地图设置</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="关闭地图设置"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="alert alert-secondary py-2 px-3 map-settings-status" id="map-key-status"
+             role="status" aria-live="polite">正在读取天地图配置...</div>
+
+        <p class="mb-2"><strong>当前底图：天地图</strong></p>
+        <p class="map-settings-help mb-3">
+            天地图是项目唯一在线底图。Key 仅保存在当前浏览器，不会上传服务器；
+            清除本地 Key 后会回退到服务端配置。
+        </p>
+
+        <label class="form-label fw-semibold" for="tianditu-key-input">天地图浏览器端 Key</label>
+        <div class="input-group mb-2">
+            <input type="password" class="form-control" id="tianditu-key-input"
+                   autocomplete="off" autocapitalize="off" spellcheck="false"
+                   placeholder="请输入天地图浏览器端 Key">
+            <button class="btn btn-outline-secondary" type="button" aria-pressed="false"
+                    id="tianditu-key-toggle" onclick="toggleTiandituKeyVisibility()">显示</button>
+        </div>
+        <div class="form-text map-settings-help mb-3">
+            Key 需在天地图控制台配置当前访问域名/IP 白名单；生产环境建议使用 HTTPS。
+        </div>
+
+        <div class="map-settings-actions d-grid gap-2">
+            <button type="button" class="btn btn-primary" id="tianditu-key-save"
+                    onclick="saveTiandituKey()">保存并应用</button>
+            <button type="button" class="btn btn-outline-secondary" id="tianditu-key-clear"
+                    onclick="clearTiandituKey()">清除本地 Key</button>
+        </div>
+
+        <hr class="my-4">
+        <p class="map-settings-help mb-2">
+            服务端未配置 Key 时，可在这里为当前浏览器填写。多名用户共用时，
+            建议在部署环境变量中配置 <code>TIANDITU_KEY</code>。
+        </p>
+        <a href="https://console.tianditu.gov.cn/" target="_blank" rel="noopener noreferrer"
+           class="map-settings-help">前往天地图控制台</a>
+    </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     Bootstrap JS
+══════════════════════════════════════════════════════ -->
+<script defer src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script defer src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
+<script>window.MAP_CONFIG = {{ map_config|tojson }};</script>
+
+<script>
+/* ============================================================
+   全局状态与常量
+============================================================ */
+const MAP_CFG = window.MAP_CONFIG || { provider: 'none', enabled: false };
+const CRS = {
+    wgs84:    { label: 'WGS84',          kind: 'geo'  },
+    cgcs2000: { label: 'CGCS2000',       kind: 'proj' },
+    gcj02:    { label: 'GCJ02（火星）',  kind: 'geo'  },
+    bd09:     { label: 'BD09（百度）',   kind: 'geo'  },
+};
+const DEFAULT_TARGET = {
+    wgs84: 'cgcs2000',
+    cgcs2000: 'wgs84',
+    gcj02: 'wgs84',
+    bd09: 'wgs84',
+};
+const SAMPLES = {
+    wgs84:    { lon: 116.397428, lat: 39.909230, name: '北京天安门' },
+    gcj02:    { lon: 116.403672, lat: 39.910634, name: '北京天安门' },
+    bd09:     { lon: 116.410044, lat: 39.916973, name: '北京天安门' },
+    cgcs2000: { x: 4419624.3249, y: 39448475.8151, band: 39, name: '北京天安门' },
+};
+
+let g_dmsMode    = 'dec2dms';
+let g_batchFile  = '';
+let g_dmsResults = [];
+let g_lastSingle = null;
+let g_lastBatchResults = [];
+let g_singleMap = null, g_singleLayer = null;
+let g_batchMap = null,  g_batchLayer = null;
+
+
+/* ============================================================
+   通用工具
+============================================================ */
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
+function toggle(id, show) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('d-none', !show);
+}
+
+function crsLabel(type) {
+    return (CRS[type] || { label: type }).label;
+}
+
+function addLog(msg, type = 'info') {
+    const box  = document.getElementById('log-box');
+    const time = new Date().toLocaleTimeString();
+    const cls  = { ok: 'log-ok', err: 'log-err', info: 'log-info' }[type] ?? 'log-info';
+    const icon = { ok: '✅', err: '❌', info: '📌' }[type] ?? '📌';
+    const div  = document.createElement('div');
+    const t    = document.createElement('span');
+    t.className = 'log-time';
+    t.textContent = `[${time}]`;
+    const c    = document.createElement('span');
+    c.className = cls;
+    c.textContent = `${icon} ${msg}`;
+    div.append(t, ' ', c);
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+}
+
+function clearLog() {
+    document.getElementById('log-box').innerHTML = '';
+    addLog('日志已清空');
+}
+
+
+/* ============================================================
+   单点转换 — 表单联动
+============================================================ */
+function onSingleSourceChange() {
+    const src = document.getElementById('s-sourceType').value;
+    document.getElementById('s-targetType').value = DEFAULT_TARGET[src] || 'wgs84';
+    updateSingleForm();
+}
+
+function onSingleTargetChange() {
+    updateSingleForm();
+}
+
+function updateSingleForm() {
+    const src = document.getElementById('s-sourceType').value;
+    const tgt = document.getElementById('s-targetType').value;
+    const srcCgcs = src === 'cgcs2000';
+    const tgtCgcs = tgt === 'cgcs2000';
+
+    const showBand = srcCgcs || tgtCgcs;
+
+    toggle('s-geo-inputs', !srcCgcs);
+    toggle('s-cgcs-inputs', srcCgcs);
+    toggle('s-source-band-opts', srcCgcs);
+    toggle('s-target-band-opts', tgtCgcs);
+    toggle('s-target-band-num-wrap', tgtCgcs);
+    toggle('s-band-type-col', showBand);
+    toggle('s-band-extra', showBand);
+    const decCol = document.getElementById('s-decimal-col');
+    decCol.classList.toggle('col-6', showBand);
+    decCol.classList.toggle('col-12', !showBand);
+    document.getElementById('s-bandType').disabled = !showBand;
+
+    updateSingleSample();
+
+    const note = document.getElementById('s-crs-note');
+    if (src === 'gcj02' || src === 'bd09' || tgt === 'gcj02' || tgt === 'bd09') {
+        note.textContent = 'GCJ02 / BD09 为近似算法，仅适用于中国范围；与官方接口结果可能存在米级差异。';
+    } else if (srcCgcs || tgtCgcs) {
+        note.textContent = 'CGCS2000 使用高斯-克吕格投影；X = 北方向(Northing)，Y = 东方向(Easting)。带号必须与数据一致。';
+    } else {
+        note.textContent = 'WGS84 与 CGCS2000 在厘米级上兼容；输入坐标将先统一换算为 WGS84 再转换。';
+    }
+
+    resetSingleResult();
+}
+
+function resetSingleResult(message = '等待转换...') {
+    g_lastSingle = null;
+    const rb = document.getElementById('s-result');
+    rb.textContent = message;
+    rb.className = 'result-box';
+    document.getElementById('s-map').classList.add('d-none');
+    document.getElementById('s-map-legend').classList.add('d-none');
+    document.getElementById('s-map-warning').classList.add('d-none');
+    document.getElementById('s-copy-btn').disabled = true;
+}
+
+function swapSingleCrs() {
+    const srcEl = document.getElementById('s-sourceType');
+    const tgtEl = document.getElementById('s-targetType');
+    const src = srcEl.value;
+    const tgt = tgtEl.value;
+    srcEl.value = tgt;
+    tgtEl.value = src;
+    clearSingleInputs(false);
+    updateSingleForm();
+    addLog(`已交换坐标系：${crsLabel(src)} ↔ ${crsLabel(tgt)}，请重新输入坐标`, 'info');
+}
+
+function clearSingleInputs(log = true) {
+    ['s-lon', 's-lat', 's-cgcsX', 's-cgcsY', 's-bandNum', 's-targetBandNum'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    resetSingleResult();
+    if (log) addLog('已清空单点输入', 'info');
+}
+
+function fillSingleSample() {
+    const src = document.getElementById('s-sourceType').value;
+    const is6 = document.getElementById('s-bandType').value === '6°分带';
+
+    if (src === 'cgcs2000') {
+        const withBand = document.getElementById('s-sourceWithBand').checked;
+        const band = is6 ? 20 : 39;
+        const y = withBand
+            ? (is6 ? 20448475.8151 : 39448475.8151)
+            : 448475.8151;
+        document.getElementById('s-cgcsX').value = '4419624.3249';
+        document.getElementById('s-cgcsY').value = y.toFixed(4);
+        document.getElementById('s-bandNum').value = String(band);
+    } else {
+        const sample = SAMPLES[src] || SAMPLES.wgs84;
+        document.getElementById('s-lon').value = String(sample.lon);
+        document.getElementById('s-lat').value = String(sample.lat);
+    }
+
+    resetSingleResult();
+    addLog(`已填入${crsLabel(src)}示例：北京天安门`, 'info');
+}
+
+function updateSingleSample() {
+    const src = document.getElementById('s-sourceType').value;
+    const is6 = document.getElementById('s-bandType').value === '6°分带';
+
+    if (src === 'cgcs2000') {
+        const withBand = document.getElementById('s-sourceWithBand').checked;
+        const band = is6 ? 20 : 39;
+        const eastingWithBand = is6 ? 20448475.8151 : 39448475.8151;
+        const eastingNoBand = 448475.8151;
+        document.getElementById('s-bandNum').placeholder = `示例：${band}（北京天安门所在带）`;
+        document.getElementById('s-cgcsY').placeholder =
+            `示例：${(withBand ? eastingWithBand : eastingNoBand).toFixed(4)}` +
+            `（北京，${is6 ? '6' : '3'}°分带${band}，${withBand ? '含' : '不含'}带号）`;
+        return;
+    }
+
+    const sample = SAMPLES[src] || SAMPLES.wgs84;
+    document.getElementById('s-lon-label').textContent = `${crsLabel(src)} 经度（°E）`;
+    document.getElementById('s-lat-label').textContent = `${crsLabel(src)} 纬度（°N）`;
+    document.getElementById('s-lon').placeholder = `示例：${sample.lon}（${sample.name}）`;
+    document.getElementById('s-lat').placeholder = `示例：${sample.lat}（${sample.name}）`;
+}
+
+
+/* ============================================================
+   单点转换 — 执行
+============================================================ */
+async function doSingleConvert() {
+    const rb = document.getElementById('s-result');
+    rb.className = 'result-box';
+    rb.textContent = '转换中...';
+    document.getElementById('s-copy-btn').disabled = true;
+
+    const src = document.getElementById('s-sourceType').value;
+    const tgt = document.getElementById('s-targetType').value;
+    const bandType = document.getElementById('s-bandType').value;
+    const decimal = parseInt(document.getElementById('s-decimal').value, 10);
+    const sourceWithBand = document.getElementById('s-sourceWithBand').checked;
+    const targetWithBand = document.getElementById('s-targetWithBand').checked;
+    const targetBandRaw = document.getElementById('s-targetBandNum').value.trim();
+
+    const payload = {
+        sourceType: src,
+        targetType: tgt,
+        bandType,
+        decimalPlaces: decimal,
+        sourceWithBand,
+        targetWithBand,
+    };
+    if (targetBandRaw) payload.targetBandNum = parseInt(targetBandRaw, 10);
+
+    if (src === 'cgcs2000') {
+        const x  = document.getElementById('s-cgcsX').value.trim();
+        const y  = document.getElementById('s-cgcsY').value.trim();
+        const bn = document.getElementById('s-bandNum').value.trim();
+        if (!x || !y)  { showResultErr(rb, '请输入 X 坐标和 Y 坐标'); return; }
+        if (!bn)       { showResultErr(rb, '请输入带号（必填）'); return; }
+        payload.lonX    = parseFloat(x);
+        payload.latY    = parseFloat(y);
+        payload.bandNum = parseInt(bn, 10);
+    } else {
+        const lon = document.getElementById('s-lon').value.trim();
+        const lat = document.getElementById('s-lat').value.trim();
+        if (!lon || !lat) { showResultErr(rb, '请输入经度和纬度'); return; }
+        payload.lonX = parseFloat(lon);
+        payload.latY = parseFloat(lat);
+    }
+
+    if (!Number.isFinite(payload.lonX) || !Number.isFinite(payload.latY)) {
+        showResultErr(rb, '坐标必须是有效数字');
+        return;
+    }
+
+    try {
+        const resp = await fetch('/convert_single', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            throw new Error(`服务返回了非 JSON 响应（HTTP ${resp.status}）`);
+        }
+        const data = await resp.json();
+
+        if (!resp.ok || data.status !== 'success') {
+            showResultErr(rb, data.message || `请求失败（HTTP ${resp.status}）`);
+            addLog(`单点转换失败：${data.message || resp.status}`, 'err');
+            return;
+        }
+
+        const r = data.result;
+        const srcLabel = crsLabel(r.source_type);
+        const dstLabel = crsLabel(r.target_type);
+        const compact = !!(window.MobileEnhance && window.MobileEnhance.isMobile());
+        const lines = [`转换成功（${srcLabel} → ${dstLabel}）`, '───────────────────────────'];
+
+        if (r.source_type === 'cgcs2000' && r.source && r.source.type === 'cgcs2000') {
+            lines.push(compact
+                ? `源带号：${r.source.band_num}`
+                : `源带号         ：${r.source.band_num}`);
+            lines.push(compact
+                ? `源中央子午线：${r.source.central_lon}°`
+                : `源中央子午线   ：${r.source.central_lon}°`);
+        }
+        if (r.target_type === 'cgcs2000') {
+            lines.push(compact
+                ? `目标带号：${r.target.band_num}`
+                : `目标带号       ：${r.target.band_num}`);
+            lines.push(compact
+                ? `目标中央子午线：${r.target.central_lon}°`
+                : `目标中央子午线 ：${r.target.central_lon}°`);
+            lines.push(compact
+                ? `X坐标(北方向)：${r.target.x} 米`
+                : `X坐标(北方向)  ：${r.target.x} 米`);
+            lines.push(compact
+                ? `Y坐标(东方向)：${r.target.y} 米`
+                : `Y坐标(东方向)  ：${r.target.y} 米`);
+        } else {
+            lines.push(`经度(${dstLabel})：${r.target.longitude}°E`);
+            lines.push(`纬度(${dstLabel})：${r.target.latitude}°N`);
+        }
+        lines.push(compact
+            ? `合并格式：\n${r.combined}`
+            : `合并格式       ：${r.combined}`);
+        if (r.source_type !== 'cgcs2000' && r.source) {
+            lines.push(compact
+                ? `源坐标：${r.source.longitude}, ${r.source.latitude}`
+                : `源坐标         ：${r.source.longitude}, ${r.source.latitude}`);
+        }
+
+        rb.textContent = lines.join('\n');
+        rb.className = 'result-box ok';
+        g_lastSingle = r;
+        document.getElementById('s-copy-btn').disabled = false;
+        addLog(`单点转换成功：${r.combined}`, 'ok');
+        refreshSingleMap();
+        if (window.MobileEnhance) window.MobileEnhance.afterSingleSuccess();
+    } catch (e) {
+        showResultErr(rb, `网络错误：${e.message}`);
+        addLog(`单点转换网络错误：${e.message}`, 'err');
+    }
+}
+
+function showResultErr(el, msg) {
+    el.textContent = `错误：${msg}`;
+    el.className = 'result-box err';
+}
+
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return;
+        } catch (_) {
+            // HTTP 或权限受限时继续走兼容回退
+        }
+    }
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    ta.style.top = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    let ok = false;
+    try {
+        ok = document.execCommand('copy');
+    } catch (_) {
+        ok = false;
+    }
+    ta.remove();
+    if (!ok) throw new Error('当前浏览器不支持自动复制，请手动选择文本');
+}
+
+function flashCopyButton(btn, ok) {
+    if (!btn) return;
+    if (!btn.dataset.originalText) btn.dataset.originalText = btn.textContent.trim();
+    btn.textContent = ok ? '✅ 已复制' : '❌ 复制失败';
+    btn.disabled = true;
+    setTimeout(() => {
+        btn.textContent = btn.dataset.originalText;
+        btn.disabled = false;
+    }, 1500);
+}
+
+async function copySingleResult(btn) {
+    if (!g_lastSingle) {
+        addLog('没有可复制的转换结果', 'err');
+        flashCopyButton(btn, false);
+        return;
+    }
+    try {
+        await copyTextToClipboard(document.getElementById('s-result').textContent);
+        addLog('结果已复制到剪贴板', 'ok');
+        flashCopyButton(btn, true);
+    } catch (err) {
+        addLog(`复制失败：${err.message}`, 'err');
+        flashCopyButton(btn, false);
+    }
+}
+
+
+/* ============================================================
+   批量转换 — 表单联动
+============================================================ */
+function onBatchSourceChange() {
+    const src = document.getElementById('b-sourceType').value;
+    document.getElementById('b-targetType').value = DEFAULT_TARGET[src] || 'wgs84';
+    updateBatchForm();
+}
+
+function onBatchTargetChange() {
+    updateBatchForm();
+}
+
+function updateBatchForm() {
+    const src = document.getElementById('b-sourceType').value;
+    const tgt = document.getElementById('b-targetType').value;
+    const srcCgcs = src === 'cgcs2000';
+    const tgtCgcs = tgt === 'cgcs2000';
+
+    const showBand = srcCgcs || tgtCgcs;
+
+    toggle('b-band-type-col', showBand);
+    toggle('b-source-band-col', srcCgcs);
+    toggle('b-target-band-col', tgtCgcs);
+    toggle('b-target-band-num-col', tgtCgcs);
+    const decCol = document.getElementById('b-decimal-col');
+    decCol.classList.toggle('col-md-3', showBand);
+    decCol.classList.toggle('col-md-6', !showBand);
+    document.getElementById('b-bandType').disabled = !showBand;
+
+    const needHtml = src === 'cgcs2000'
+        ? '需包含 <code>X坐标</code>、<code>Y坐标</code>、<code>带号</code> 列'
+        : '需包含 <code>经度</code>、<code>纬度</code> 列';
+    document.getElementById('b-tmpl-hint').innerHTML =
+        `📄 <strong>${crsLabel(src)}模板</strong>：${needHtml}`;
+    document.getElementById('b-fileHint').textContent = src === 'cgcs2000'
+        ? '支持 .xlsx / .csv / .txt，CGCS2000 模式需含“X坐标”/“Y坐标”/“带号”列'
+        : `支持 .xlsx / .csv / .txt，${crsLabel(src)} 模式需含“经度”/“纬度”列`;
+}
+
+function swapBatchCrs() {
+    const srcEl = document.getElementById('b-sourceType');
+    const tgtEl = document.getElementById('b-targetType');
+    const src = srcEl.value;
+    const tgt = tgtEl.value;
+    srcEl.value = tgt;
+    tgtEl.value = src;
+    updateBatchForm();
+    clearBatchForm(false);
+    addLog(`已交换批量坐标系：${crsLabel(src)} ↔ ${crsLabel(tgt)}，请重新选择文件`, 'info');
+}
+
+function clearBatchForm(log = true) {
+    document.getElementById('b-fileInput').value = '';
+    document.getElementById('b-startBtn').disabled = true;
+    document.getElementById('b-exportBtn').classList.add('d-none');
+    document.getElementById('b-summary').classList.add('d-none');
+    document.getElementById('b-status').textContent = '状态：未选择文件';
+    document.getElementById('b-tbody').innerHTML = '';
+    document.getElementById('b-map').classList.add('d-none');
+    document.getElementById('b-map-legend').classList.add('d-none');
+    document.getElementById('b-map-warning').classList.add('d-none');
+    g_batchFile = '';
+    g_lastBatchResults = [];
+    if (log) addLog('已清空批量任务', 'info');
+}
+
+function onFileSelected(input) {
+    const file = input.files[0];
+    if (!file) return;
+    document.getElementById('b-status').textContent =
+        `已选择：${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+    document.getElementById('b-startBtn').disabled = false;
+    addLog(`选择文件：${file.name}`, 'info');
+}
+
+function downloadTemplate() {
+    const fmt = document.getElementById('b-tmplType').value;
+    const src = document.getElementById('b-sourceType').value;
+    const tgt = document.getElementById('b-targetType').value;
+    const bandType = document.getElementById('b-bandType').value;
+    const withBand = src === 'cgcs2000'
+        ? document.getElementById('b-sourceWithBand').checked
+        : true;
+    const params = new URLSearchParams({
+        type: fmt,
+        source: src,
+        target: tgt,
+        bandType,
+        withBand: String(withBand),
+    });
+    window.location.href = `/export_template?${params.toString()}`;
+    addLog(`下载${crsLabel(src)}→${crsLabel(tgt)}模板 (${fmt.toUpperCase()})`, 'info');
+}
+
+
+/* ============================================================
+   批量转换 — 执行
+============================================================ */
+async function doBatchConvert() {
+    const fileInput = document.getElementById('b-fileInput');
+    if (!fileInput.files.length) { alert('请先选择文件'); return; }
+
+    const btn = document.getElementById('b-startBtn');
+    btn.disabled = true;
+    btn.textContent = '转换中...';
+    document.getElementById('b-exportBtn').classList.add('d-none');
+    document.getElementById('b-summary').classList.add('d-none');
+    document.getElementById('b-status').textContent = '状态：正在处理...';
+    document.getElementById('b-map').classList.add('d-none');
+    document.getElementById('b-map-legend').classList.add('d-none');
+    document.getElementById('b-map-warning').classList.add('d-none');
+    g_lastBatchResults = [];
+
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    fd.append('sourceType', document.getElementById('b-sourceType').value);
+    fd.append('targetType', document.getElementById('b-targetType').value);
+    fd.append('bandType', document.getElementById('b-bandType').value);
+    fd.append('withBand', document.getElementById('b-sourceWithBand').checked);
+    fd.append('sourceWithBand', document.getElementById('b-sourceWithBand').checked);
+    fd.append('targetWithBand', document.getElementById('b-targetWithBand').checked);
+    fd.append('decimalPlaces', document.getElementById('b-decimal').value);
+    const targetBandRaw = document.getElementById('b-targetBandNum').value.trim();
+    if (targetBandRaw) fd.append('targetBandNum', targetBandRaw);
+
+    try {
+        const resp = await fetch('/convert_batch', { method: 'POST', body: fd });
+        const ct = resp.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            throw new Error(`服务返回了非 JSON 响应（HTTP ${resp.status}）`);
+        }
+        const data = await resp.json();
+
+        if (!resp.ok || data.status !== 'success') {
+            document.getElementById('b-status').textContent =
+                `状态：失败 — ${data.message || `HTTP ${resp.status}`}`;
+            addLog(`批量转换失败：${data.message || resp.status}`, 'err');
+            return;
+        }
+
+        const tbody = document.getElementById('b-tbody');
+        tbody.innerHTML = '';
+        data.results.forEach(r => {
+            const cls = r.status === '成功' ? 'badge-ok' : 'badge-fail';
+            const note = r.status === '成功'
+                ? escapeHtml(r.note || '')
+                : `<span class="badge-fail">${escapeHtml(r.message || '')}</span>`;
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td data-label="序号">${Number(r.index)}</td>
+                <td data-label="输入数据" class="font-monospace" style="font-size:.82rem;">${escapeHtml(r.input)}</td>
+                <td data-label="输出结果" class="font-monospace" style="font-size:.82rem;">${escapeHtml(r.output || '—')}</td>
+                <td data-label="状态" class="${cls}">${escapeHtml(r.status)}</td>
+                <td data-label="备注 / 错误" style="font-size:.82rem;">${note}</td>`;
+            tbody.appendChild(row);
+        });
+
+        g_batchFile = data.temp_file;
+        g_lastBatchResults = data.results;
+        const summary = document.getElementById('b-summary');
+        summary.innerHTML =
+            `共 <strong>${Number(data.total)}</strong> 条 · ` +
+            `成功 <span class="badge-ok fw-bold">${Number(data.successCount)}</span> · ` +
+            `失败 <span class="badge-fail fw-bold">${Number(data.failCount)}</span>` +
+            (data.total > 50 ? ' · <em>仅显示前50条预览</em>' : '');
+        summary.classList.remove('d-none');
+
+        document.getElementById('b-exportBtn').classList.remove('d-none');
+        document.getElementById('b-status').textContent =
+            `状态：完成 ✅ 共${data.total}条，成功${data.successCount}条`;
+
+        addLog(
+            `批量转换完成：${crsLabel(data.source_type)}→${crsLabel(data.target_type)}，` +
+            `共${data.total}条，成功${data.successCount}条，失败${data.failCount}条`,
+            'ok'
+        );
+        refreshBatchMap();
+        if (window.MobileEnhance) window.MobileEnhance.afterBatchSuccess();
+    } catch (e) {
+        document.getElementById('b-status').textContent = '状态：请求失败';
+        addLog(`批量转换请求失败：${e.message}`, 'err');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '开始批量转换';
+    }
+}
+
+function exportBatchResult() {
+    if (!g_batchFile) return;
+    window.location.href = `/export_results/${encodeURIComponent(g_batchFile)}`;
+    addLog('导出批量结果 Excel', 'ok');
+}
+
+
+/* ============================================================
+   在线地图预览
+============================================================ */
+const TIANDITU_KEY_STORAGE = 'wgs84-cgcs2000.tiandituKey';
+let g_tileErrors = { single: 0, batch: 0 };
+
+function readLocalTiandituKey() {
+    try {
+        return (window.localStorage.getItem(TIANDITU_KEY_STORAGE) || '').trim();
+    } catch (_) {
+        return '';
+    }
+}
+
+function getTiandituKey() {
+    return readLocalTiandituKey() || String(MAP_CFG.tianditu_key || '').trim();
+}
+
+function hasTiandituKey() {
+    return Boolean(getTiandituKey());
+}
+
+function mapEnabled() {
+    return Boolean(MAP_CFG && MAP_CFG.enabled);
+}
+
+function mapAvailable() {
+    return mapEnabled() && hasTiandituKey() && Boolean(window.L);
+}
+
+function mapHintText() {
+    if (!mapEnabled()) {
+        return '在线地图已关闭（MAP_PROVIDER=none）。';
+    }
+    if (!hasTiandituKey()) {
+        return '天地图未配置 Key，请点击“地图设置”填写浏览器端 Key。';
+    }
+    if (!window.L) {
+        return '地图组件未加载，请刷新页面后重试。';
+    }
+    return '底图：天地图 · 坐标系：WGS84 · 启用后坐标会发送至天地图。';
+}
+
+function updateMapAvailability() {
+    const ready = mapAvailable();
+    ['s-mapEnabled', 'b-mapEnabled', 's-mapRaw', 'b-mapRaw'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.disabled = !ready;
+        if (!ready) el.checked = false;
+    });
+    ['s-mapHint', 'b-mapHint'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = mapHintText();
+    });
+    document.querySelectorAll('.map-settings-btn').forEach(btn => {
+        btn.classList.toggle('d-none', !mapEnabled());
+    });
+    if (!ready) {
+        ['s-map', 'b-map', 's-map-legend', 'b-map-legend', 's-map-warning', 'b-map-warning']
+            .forEach(id => document.getElementById(id)?.classList.add('d-none'));
+    }
+}
+
+function tileLayers() {
+    if (!mapAvailable()) return [];
+    const key = getTiandituKey();
+    if (!key) return [];
+    const subdomains = ['0', '1', '2', '3', '4', '5', '6', '7'];
+    const base = `https://t{s}.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${encodeURIComponent(key)}`;
+    const anno = `https://t{s}.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=${encodeURIComponent(key)}`;
+    return [
+        { url: base, options: { subdomains, maxZoom: 18, attribution: '© 天地图' } },
+        { url: anno, options: { subdomains, maxZoom: 18 } },
+    ];
+}
+
+function trackTileErrors(layer, which) {
+    layer.on('tileerror', () => {
+        g_tileErrors[which] = (g_tileErrors[which] || 0) + 1;
+        if (g_tileErrors[which] >= 4) showMapWarning(which);
+    });
+    layer.on('tileload', () => {
+        g_tileErrors[which] = 0;
+        hideMapWarning(which);
+    });
+}
+
+function showMapWarning(which) {
+    document.getElementById(which === 'single' ? 's-map-warning' : 'b-map-warning')
+        ?.classList.remove('d-none');
+}
+
+function hideMapWarning(which) {
+    document.getElementById(which === 'single' ? 's-map-warning' : 'b-map-warning')
+        ?.classList.add('d-none');
+}
+
+function resetMaps() {
+    if (g_singleMap) {
+        try { g_singleMap.remove(); } catch (_) {}
+        g_singleMap = null;
+        g_singleLayer = null;
+    }
+    if (g_batchMap) {
+        try { g_batchMap.remove(); } catch (_) {}
+        g_batchMap = null;
+        g_batchLayer = null;
+    }
+    g_tileErrors = { single: 0, batch: 0 };
+    ['s-map', 'b-map', 's-map-legend', 'b-map-legend', 's-map-warning', 'b-map-warning']
+        .forEach(id => document.getElementById(id)?.classList.add('d-none'));
+}
+
+function retryMaps() {
+    resetMaps();
+    updateMapAvailability();
+    refreshSingleMap();
+    refreshBatchMap();
+    addLog('已重试天地图底图加载', 'info');
+}
+
+function updateMapSettingsUI() {
+    const localKey = readLocalTiandituKey();
+    const envKey = String(MAP_CFG.tianditu_key || '').trim();
+    const input = document.getElementById('tianditu-key-input');
+    const status = document.getElementById('map-key-status');
+    const clearBtn = document.getElementById('tianditu-key-clear');
+    if (!input || !status) return;
+
+    if (document.activeElement !== input) {
+        input.value = localKey;
+    }
+    input.placeholder = envKey && !localKey
+        ? '服务端默认 Key 已配置，可留空；输入可覆盖'
+        : '请输入天地图浏览器端 Key';
+
+    if (!mapEnabled()) {
+        status.className = 'alert alert-secondary py-2 px-3 map-settings-status';
+        status.textContent = '在线地图已关闭（MAP_PROVIDER=none）。';
+    } else if (localKey) {
+        status.className = 'alert alert-success py-2 px-3 map-settings-status';
+        status.textContent = '正在使用当前浏览器保存的天地图 Key。';
+    } else if (envKey) {
+        status.className = 'alert alert-info py-2 px-3 map-settings-status';
+        status.textContent = '正在使用服务端环境变量中的默认天地图 Key。';
+    } else {
+        status.className = 'alert alert-warning py-2 px-3 map-settings-status';
+        status.textContent = '尚未配置天地图 Key，地图预览暂不可用。';
+    }
+
+    if (clearBtn) clearBtn.disabled = !localKey;
+}
+
+function showMapSettings() {
+    if (!mapEnabled()) {
+        addLog('在线地图已关闭，无法配置天地图', 'info');
+        return;
+    }
+    updateMapSettingsUI();
+    const el = document.getElementById('mapSettings');
+    if (el && window.bootstrap) {
+        window.bootstrap.Offcanvas.getOrCreateInstance(el).show();
+    }
+}
+
+function toggleTiandituKeyVisibility() {
+    const input = document.getElementById('tianditu-key-input');
+    const btn = document.getElementById('tianditu-key-toggle');
+    if (!input || !btn) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    btn.textContent = show ? '隐藏' : '显示';
+    btn.setAttribute('aria-pressed', String(show));
+}
+
+function persistTiandituKey(value) {
+    try {
+        if (value) window.localStorage.setItem(TIANDITU_KEY_STORAGE, value);
+        else window.localStorage.removeItem(TIANDITU_KEY_STORAGE);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+function applyMapSettings() {
+    resetMaps();
+    updateMapAvailability();
+    updateMapSettingsUI();
+    refreshSingleMap();
+    refreshBatchMap();
+}
+
+function saveTiandituKey() {
+    const input = document.getElementById('tianditu-key-input');
+    const status = document.getElementById('map-key-status');
+    if (!input) return;
+    const value = input.value.trim();
+    const envKey = String(MAP_CFG.tianditu_key || '').trim();
+    if (!value && !envKey) {
+        if (status) {
+            status.className = 'alert alert-danger py-2 px-3 map-settings-status';
+            status.textContent = '请输入天地图浏览器端 Key 后再保存。';
+        }
+        return;
+    }
+    if (!persistTiandituKey(value)) {
+        if (status) {
+            status.className = 'alert alert-danger py-2 px-3 map-settings-status';
+            status.textContent = '浏览器禁止使用 localStorage，无法保存 Key。';
+        }
+        return;
+    }
+    applyMapSettings();
+    addLog(value ? '天地图 Key 已保存到当前浏览器' : '已切换为服务端默认天地图 Key', 'ok');
+    const el = document.getElementById('mapSettings');
+    if (el && window.bootstrap) {
+        const instance = window.bootstrap.Offcanvas.getInstance(el);
+        if (instance) instance.hide();
+    }
+}
+
+function clearTiandituKey() {
+    const input = document.getElementById('tianditu-key-input');
+    if (!persistTiandituKey('')) {
+        addLog('浏览器禁止使用 localStorage，无法清除本地 Key', 'err');
+        return;
+    }
+    if (input) input.value = '';
+    applyMapSettings();
+    addLog('已清除本地天地图 Key', 'info');
+}
+
+function ensureMap(which) {
+    if (which === 'single' && g_singleMap) return g_singleMap;
+    if (which === 'batch'  && g_batchMap)  return g_batchMap;
+
+    const id = which === 'single' ? 's-map' : 'b-map';
+    const layers = tileLayers();
+    if (!layers.length) return null;
+
+    const map = L.map(id, { zoomControl: true, attributionControl: true }).setView([35, 105], 4);
+    layers.forEach(cfg => {
+        const layer = L.tileLayer(cfg.url, cfg.options).addTo(map);
+        trackTileErrors(layer, which);
+    });
+    const group = L.layerGroup().addTo(map);
+
+    if (which === 'single') {
+        g_singleMap = map;
+        g_singleLayer = group;
+        return g_singleMap;
+    }
+    g_batchMap = map;
+    g_batchLayer = group;
+    return g_batchMap;
+}
+
+function toLatLng(lonLat) {
+    return L.latLng(lonLat[1], lonLat[0]);
+}
+
+function addCircle(layer, lonLat, options, title, lines) {
+    const marker = L.circleMarker(toLatLng(lonLat), options);
+    const div = document.createElement('div');
+    const strong = document.createElement('strong');
+    strong.textContent = title;
+    div.appendChild(strong);
+    (lines || []).forEach(text => {
+        const p = document.createElement('div');
+        p.textContent = text;
+        div.appendChild(p);
+    });
+    marker.bindPopup(div);
+    marker.addTo(layer);
+    return marker;
+}
+
+function fitMap(map, points) {
+    if (!points.length) return;
+    const unique = [];
+    points.forEach(p => {
+        if (!unique.some(q => q.lat === p.lat && q.lng === p.lng)) unique.push(p);
+    });
+    if (unique.length === 1) {
+        map.setView(unique[0], 15);
+        return;
+    }
+    map.fitBounds(L.latLngBounds(unique), { padding: [30, 30], maxZoom: 16 });
+}
+
+function rawPoint(obj) {
+    if (!obj || obj.type === 'cgcs2000') return null;
+    if (typeof obj.longitude !== 'number' || typeof obj.latitude !== 'number') return null;
+    return [obj.longitude, obj.latitude];
+}
+
+function refreshSingleMap() {
+    const box = document.getElementById('s-map');
+    const legend = document.getElementById('s-map-legend');
+    const enabled = document.getElementById('s-mapEnabled').checked;
+
+    if (!enabled || !g_lastSingle || !mapAvailable() || !g_lastSingle.map) {
+        box.classList.add('d-none');
+        legend.classList.add('d-none');
+        document.getElementById('s-map-warning').classList.add('d-none');
+        return;
+    }
+
+    box.classList.remove('d-none');
+    legend.classList.remove('d-none');
+    const map = ensureMap('single');
+    if (!map) {
+        box.classList.add('d-none');
+        legend.classList.add('d-none');
+        return;
+    }
+    g_singleLayer.clearLayers();
+
+    const crs = MAP_CFG.tile_crs || 'wgs84';
+    const md = g_lastSingle.map;
+    const srcPt = md.source[crs] || md.source.wgs84;
+    const dstPt = md.target[crs] || md.target.wgs84;
+    const points = [];
+
+    addCircle(g_singleLayer, srcPt, {
+        radius: 10, color: '#0d6efd', weight: 2,
+        fillColor: '#0d6efd', fillOpacity: 0.25,
+    }, '源坐标（校正后）', [
+        `${crsLabel(g_lastSingle.source_type)}：${srcPt[1].toFixed(6)}, ${srcPt[0].toFixed(6)}`,
+    ]);
+    points.push(toLatLng(srcPt));
+
+    addCircle(g_singleLayer, dstPt, {
+        radius: 5, color: '#dc3545', weight: 2,
+        fillColor: '#dc3545', fillOpacity: 0.9,
+    }, '目标坐标（校正后）', [
+        `${crsLabel(g_lastSingle.target_type)}：${dstPt[1].toFixed(6)}, ${dstPt[0].toFixed(6)}`,
+        `往返偏差：${Number(md.distance_m || 0).toFixed(3)} 米`,
+    ]);
+    points.push(toLatLng(dstPt));
+
+    if (Math.abs(srcPt[0] - dstPt[0]) > 1e-9 || Math.abs(srcPt[1] - dstPt[1]) > 1e-9) {
+        L.polyline([toLatLng(srcPt), toLatLng(dstPt)], {
+            color: '#6c757d', weight: 1, dashArray: '4 4',
+        }).addTo(g_singleLayer);
+    }
+
+    if (document.getElementById('s-mapRaw').checked) {
+        const differs = (a, b) => Math.abs(a[0] - b[0]) > 1e-9 || Math.abs(a[1] - b[1]) > 1e-9;
+        const rawSrc = g_lastSingle.source.type !== crs ? rawPoint(g_lastSingle.source) : null;
+        if (rawSrc && differs(rawSrc, srcPt)) {
+            addCircle(g_singleLayer, rawSrc, {
+                radius: 9, color: '#fd7e14', weight: 2,
+                fillColor: 'transparent', fillOpacity: 0,
+            }, '源原始数值（未按底图坐标系校正）', [
+                `${rawSrc[1].toFixed(6)}, ${rawSrc[0].toFixed(6)}`,
+            ]);
+            points.push(toLatLng(rawSrc));
+        }
+        const rawDst = g_lastSingle.target.type !== crs ? rawPoint(g_lastSingle.target) : null;
+        if (rawDst && differs(rawDst, dstPt)) {
+            addCircle(g_singleLayer, rawDst, {
+                radius: 7, color: '#fd7e14', weight: 2, dashArray: '3 3',
+                fillColor: 'transparent', fillOpacity: 0,
+            }, '目标原始数值（未按底图坐标系校正）', [
+                `${rawDst[1].toFixed(6)}, ${rawDst[0].toFixed(6)}`,
+            ]);
+            points.push(toLatLng(rawDst));
+        }
+    }
+
+    fitMap(map, points);
+    setTimeout(() => map.invalidateSize(), 60);
+}
+
+function refreshBatchMap() {
+    const box = document.getElementById('b-map');
+    const legend = document.getElementById('b-map-legend');
+    const enabled = document.getElementById('b-mapEnabled').checked;
+
+    if (!enabled || !g_lastBatchResults.length || !mapAvailable()) {
+        box.classList.add('d-none');
+        legend.classList.add('d-none');
+        document.getElementById('b-map-warning').classList.add('d-none');
+        return;
+    }
+
+    box.classList.remove('d-none');
+    legend.classList.remove('d-none');
+    const map = ensureMap('batch');
+    if (!map) {
+        box.classList.add('d-none');
+        legend.classList.add('d-none');
+        return;
+    }
+    g_batchLayer.clearLayers();
+
+    const crs = MAP_CFG.tile_crs || 'wgs84';
+    const points = [];
+
+    g_lastBatchResults.forEach(r => {
+        if (r.status !== '成功' || !r.map) return;
+        const srcPt = r.map.source[crs] || r.map.source.wgs84;
+        const dstPt = r.map.target[crs] || r.map.target.wgs84;
+
+        addCircle(g_batchLayer, srcPt, {
+            radius: 7, color: '#0d6efd', weight: 1,
+            fillColor: '#0d6efd', fillOpacity: 0.25,
+        }, `第 ${r.index} 条 · 源`, [r.input]);
+        addCircle(g_batchLayer, dstPt, {
+            radius: 4, color: '#dc3545', weight: 1,
+            fillColor: '#dc3545', fillOpacity: 0.9,
+        }, `第 ${r.index} 条 · 目标`, [r.output || '—']);
+        points.push(toLatLng(srcPt), toLatLng(dstPt));
+
+        if (r.map.distance_m > 0.5) {
+            L.polyline([toLatLng(srcPt), toLatLng(dstPt)], {
+                color: '#6c757d', weight: 1, dashArray: '4 4',
+            }).addTo(g_batchLayer);
+        }
+    });
+
+    if (!points.length) {
+        box.classList.add('d-none');
+        legend.classList.add('d-none');
+        return;
+    }
+
+    fitMap(map, points);
+    setTimeout(() => map.invalidateSize(), 60);
+}
+
+
+/* ============================================================
+   经纬度格式转换 — 工具函数
+============================================================ */
+function dec2dms(dec) {
+    if (!Number.isFinite(dec)) throw new Error('请输入有效的十进制数字');
+    const sign = dec < 0 ? '-' : '';
+    const abs  = Math.abs(dec);
+    const d    = Math.floor(abs);
+    const mf   = (abs - d) * 60;
+    const m    = Math.floor(mf);
+    const s    = (mf - m) * 60;
+    return `${sign}${d}°${String(m).padStart(2, '0')}'${s.toFixed(4)}"`;
+}
+
+function dms2dec(str) {
+    const s = str.trim()
+        .replace(/[°dD]/g, '°')
+        .replace(/[′'mM]/g, "'")
+        .replace(/[″"sS]/g, '"')
+        .replace(/\s+/g, ' ');
+
+    let m = s.match(/^(-?)(\d+(?:\.\d+)?)°\s*(\d+(?:\.\d+)?)'?\s*(\d+(?:\.\d+)?)?"?\s*([NSEWnsew]?)$/);
+    if (!m) {
+        m = s.match(/^(-?)(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s*([NSEWnsew]?)$/);
+    }
+    if (!m) throw new Error(`无法解析度分秒格式：${str}`);
+
+    const [, neg, deg, min, sec = '0', dir] = m;
+    const d = parseFloat(deg), mi = parseFloat(min), se = parseFloat(sec);
+    if (![d, mi, se].every(Number.isFinite)) {
+        throw new Error(`无法解析度分秒格式：${str}`);
+    }
+    if (mi >= 60 || se >= 60) throw new Error('度分秒格式中分和秒必须小于 60');
+    let dec = d + mi / 60 + se / 3600;
+    if (neg === '-' || /[SWsw]/.test(dir)) dec = -dec;
+    return dec;
+}
+
+function dms2mining(str) {
+    const dec  = dms2dec(str);
+    const sign = dec < 0 ? '-' : '';
+    const abs  = Math.abs(dec);
+    const d    = Math.floor(abs);
+    const mf   = (abs - d) * 60;
+    const m    = Math.floor(mf);
+    const sf   = (mf - m) * 60;
+    const sInt = Math.floor(sf);
+    const sFrac = (sf - sInt).toFixed(4).slice(2);
+    return `${sign}${d}.${String(m).padStart(2, '0')}${String(sInt).padStart(2, '0')}${sFrac}`;
+}
+
+
+/* ============================================================
+   经纬度格式转换 — 模式切换
+============================================================ */
+const DMS_CFG = {
+    dec2dms: {
+        lonLbl: '经度（十进制）', latLbl: '纬度（十进制）',
+        lonPH: '如 116.397428', latPH: '如 39.909230',
+        hint: '每行一组，<strong>经度在前、纬度在后</strong>，空格/逗号/Tab 分隔（十进制数字）',
+    },
+    dms2dec: {
+        lonLbl: '经度（度分秒）', latLbl: '纬度（度分秒）',
+        lonPH: "如 116°23'50.7408\"", latPH: "如 39°54'33.228\"",
+        hint: '每行一组，<strong>经度在前、纬度在后</strong>，空格/逗号/Tab 分隔（度分秒格式）',
+    },
+    dms2mining: {
+        lonLbl: '经度（度分秒）', latLbl: '纬度（度分秒）',
+        lonPH: "如 116°23'50.7408\"", latPH: "如 39°54'33.228\"",
+        hint: '每行一组，<strong>经度在前、纬度在后</strong>，空格/逗号/Tab 分隔（度分秒格式）',
+    },
+};
+
+function setDmsMode(mode) {
+    g_dmsMode = mode;
+    const btns = document.querySelectorAll('#dms-mode-btns .dir-btn');
+    const modes = ['dec2dms', 'dms2dec', 'dms2mining'];
+    btns.forEach((b, i) => b.classList.toggle('active', modes[i] === mode));
+
+    const cfg = DMS_CFG[mode];
+    document.getElementById('dms-lon-lbl').textContent = cfg.lonLbl;
+    document.getElementById('dms-lat-lbl').textContent = cfg.latLbl;
+    document.getElementById('dms-lon').placeholder    = cfg.lonPH;
+    document.getElementById('dms-lat').placeholder    = cfg.latPH;
+    document.getElementById('dms-batch-hint').innerHTML = '— ' + cfg.hint;
+    clearDmsSingle();
+    clearDmsBatch();
+}
+
+
+/* ============================================================
+   经纬度格式转换 — 单点
+============================================================ */
+function applyDmsMode(lonStr, latStr) {
+    switch (g_dmsMode) {
+        case 'dec2dms':
+            return { lon: dec2dms(parseFloat(lonStr)), lat: dec2dms(parseFloat(latStr)) };
+        case 'dms2dec':
+            return { lon: dms2dec(lonStr).toFixed(8), lat: dms2dec(latStr).toFixed(8) };
+        case 'dms2mining':
+            return { lon: dms2mining(lonStr), lat: dms2mining(latStr) };
+        default:
+            throw new Error('未知的格式转换模式');
+    }
+}
+
+function doDmsSingle() {
+    const lonStr = document.getElementById('dms-lon').value.trim();
+    const latStr = document.getElementById('dms-lat').value.trim();
+    if (!lonStr || !latStr) { alert('请输入经度和纬度'); return; }
+    try {
+        const { lon, lat } = applyDmsMode(lonStr, latStr);
+        document.getElementById('dms-lon-res').value = lon;
+        document.getElementById('dms-lat-res').value = lat;
+        document.getElementById('dms-copy-btn').disabled = false;
+        addLog(`格式转换成功(${g_dmsMode})：${lonStr}, ${latStr} → ${lon}, ${lat}`, 'ok');
+    } catch (e) {
+        alert(`转换失败：${e.message}`);
+        addLog(`格式转换失败：${e.message}`, 'err');
+    }
+}
+
+function clearDmsSingle() {
+    ['dms-lon', 'dms-lat', 'dms-lon-res', 'dms-lat-res'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('dms-copy-btn').disabled = true;
+}
+
+async function copyDmsSingle(btn) {
+    const lon = document.getElementById('dms-lon-res').value;
+    const lat = document.getElementById('dms-lat-res').value;
+    if (!lon || !lat) {
+        addLog('没有可复制的格式转换结果', 'err');
+        flashCopyButton(btn, false);
+        return;
+    }
+    try {
+        await copyTextToClipboard(`${lon}, ${lat}`);
+        addLog('格式转换结果已复制', 'ok');
+        flashCopyButton(btn, true);
+    } catch (err) {
+        addLog(`复制失败：${err.message}`, 'err');
+        flashCopyButton(btn, false);
+    }
+}
+
+
+/* ============================================================
+   经纬度格式转换 — 批量
+============================================================ */
+function doDmsBatch() {
+    const raw = document.getElementById('dms-batch-input').value.trim();
+    if (!raw) { alert('请输入批量数据'); return; }
+
+    const lines = raw.split('\n').filter(l => l.trim());
+    g_dmsResults = [];
+
+    lines.forEach((line, i) => {
+        const parts = line.trim().split(/[\s,\t]+/).filter(Boolean);
+        const item = { index: i + 1, input: line.trim(), result: '', status: '成功', error: '' };
+        try {
+            if (parts.length < 2) throw new Error('需要两列：经度 纬度');
+            const { lon, lat } = applyDmsMode(parts[0], parts[1]);
+            item.result = `${lon}, ${lat}`;
+        } catch (e) {
+            item.status = '失败';
+            item.error  = e.message;
+        }
+        g_dmsResults.push(item);
+    });
+
+    const tbody = document.getElementById('dms-batch-tbody');
+    tbody.innerHTML = '';
+    g_dmsResults.forEach(r => {
+        const cls = r.status === '成功' ? 'badge-ok' : 'badge-fail';
+        const tr  = document.createElement('tr');
+        tr.innerHTML = `
+            <td data-label="序号">${Number(r.index)}</td>
+            <td data-label="输入" class="font-monospace" style="font-size:.82rem;">${escapeHtml(r.input)}</td>
+            <td data-label="结果" class="font-monospace" style="font-size:.82rem;">
+                ${r.status === '成功' ? escapeHtml(r.result) : `<span class="badge-fail">${escapeHtml(r.error)}</span>`}
+            </td>
+            <td data-label="状态" class="${cls}">${escapeHtml(r.status)}</td>`;
+        tbody.appendChild(tr);
+    });
+
+    const ok = g_dmsResults.filter(r => r.status === '成功').length;
+    document.getElementById('dms-export-btn').disabled = ok === 0;
+    addLog(`格式批量转换完成：共${lines.length}条，成功${ok}条`, 'ok');
+}
+
+function clearDmsBatch() {
+    document.getElementById('dms-batch-input').value = '';
+    document.getElementById('dms-batch-tbody').innerHTML = '';
+    document.getElementById('dms-export-btn').disabled = true;
+    g_dmsResults = [];
+}
+
+function csvCell(value) {
+    let s = String(value ?? '');
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return `"${s.replace(/"/g, '""')}"`;
+}
+
+function exportDmsResult() {
+    if (!g_dmsResults.length) return;
+    let csv = '\uFEFF序号,输入,结果,状态\n';
+    g_dmsResults.forEach(r => {
+        const row = [r.index, r.input, r.result, r.status === '成功' ? r.status : r.error];
+        csv += row.map(csvCell).join(',') + '\n';
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `经纬度格式转换结果_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    addLog('导出格式转换结果 CSV', 'ok');
+}
+
+
+/* ============================================================
+   初始化
+============================================================ */
+window.invalidateAppMaps = function () {
+    if (g_singleMap) g_singleMap.invalidateSize();
+    if (g_batchMap)  g_batchMap.invalidateSize();
+};
+
+function init() {
+    updateMapAvailability();
+    updateMapSettingsUI();
+    onSingleSourceChange();
+    onBatchSourceChange();
+    setDmsMode('dec2dms');
+
+    ['s-lon', 's-lat', 's-cgcsX', 's-cgcsY', 's-bandNum', 's-targetBandNum'].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                doSingleConvert();
+            }
+        });
+    });
+
+    document.querySelectorAll('#mainTabs button[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', () => {
+            window.invalidateAppMaps();
+        });
+    });
+
+    const keyInput = document.getElementById('tianditu-key-input');
+    if (keyInput) {
+        keyInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                saveTiandituKey();
+            }
+        });
+    }
+
+    const mapSettingsEl = document.getElementById('mapSettings');
+    if (mapSettingsEl) {
+        mapSettingsEl.addEventListener('shown.bs.offcanvas', updateMapSettingsUI);
+        mapSettingsEl.addEventListener('hidden.bs.offcanvas', () => {
+            const input = document.getElementById('tianditu-key-input');
+            const toggle = document.getElementById('tianditu-key-toggle');
+            if (input) input.type = 'password';
+            if (toggle) {
+                toggle.textContent = '显示';
+                toggle.setAttribute('aria-pressed', 'false');
+            }
+        });
+    }
+
+    addLog('程序启动成功：支持 WGS84 / CGCS2000 / GCJ02 / BD09', 'ok');
+    addLog('支持格式：Excel(.xlsx) · CSV(.csv) · TXT(.txt)', 'info');
+    addLog('X坐标 = 北方向(Northing) · Y坐标 = 东方向(Easting)', 'info');
+    if (!mapEnabled()) {
+        addLog('在线地图已关闭（MAP_PROVIDER=none）', 'info');
+    } else if (!hasTiandituKey()) {
+        addLog('天地图未配置 Key，请打开地图设置填写', 'info');
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+
+</script>
+<script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+</body>
+</html>
