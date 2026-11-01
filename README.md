@@ -11,6 +11,8 @@
 - 🐳 Docker / 群晖 Container Manager 一键部署（amd64 / arm64 多架构镜像）
 
 > 后续开发、测试和运维请阅读 [技术文档与交接说明](docs/TECHNICAL.md)。
+>
+> 版本变更请查看 [更新记录](CHANGELOG.md)。
 
 ## 界面预览
 
@@ -139,7 +141,7 @@ services:
 ### 2) 只改需要的地方（可选）
 
 - 改端口：把 `5000:5000` 左边改为你想要的端口（如 `12345:5000`）
-- 改版本：把 `latest` 改为固定版本（如 `2.0.0`）
+- 改版本：把 `latest` 改为固定版本（如 `2.0.1`）
 - 启用地图：配置 `MAP_PROVIDER=tianditu`；`TIANDITU_KEY` 可填在环境变量，也可部署后在页面“地图设置”中填写
 
 ### 3) 点击“下一步/完成”部署
@@ -152,7 +154,7 @@ services:
 期望返回：
 
 ```json
-{"status":"ok"}
+{"status":"ok","version":"2.0.1"}
 ```
 
 ---
@@ -210,6 +212,47 @@ docker compose -f docker-compose.full.yml up -d
 
 ---
 
+## 🏷️ 版本与镜像标签
+
+Git 标签和镜像标签不是同一种格式：
+
+| Git 标签 | GHCR 镜像标签 |
+| --- | --- |
+| `v2.0.1` | `2.0.1`、`2.0`、`latest` |
+| `v2.0.0` | `2.0.0`，历史固定版本仍可拉取 |
+
+`APP_VERSION` 必须填写镜像标签，不能带 `v` 前缀：
+
+```env
+# 正确
+APP_VERSION=2.0.1
+APP_VERSION=latest
+
+# 错误
+APP_VERSION=v2.0.1
+```
+
+### 拉取失败：manifest unknown
+
+通常是 Compose 中的镜像标签不存在。按顺序检查：
+
+```bash
+cd /path/to/wgs84-cgcs2000
+docker compose config | grep image
+docker pull ghcr.io/marod1m/wgs84-cgcs2000:2.0.1
+docker manifest inspect ghcr.io/marod1m/wgs84-cgcs2000:latest
+```
+
+处理方式：
+
+- 将 `APP_VERSION` 改为 `2.0.1` 或 `latest`
+- 不要使用 Git 标签 `v2.0.1`
+- 修改后执行 `docker compose pull && docker compose up -d`
+- 如果使用 registry 镜像/代理，确认已同步新标签
+- 查看运行版本：`curl http://你的地址:端口/healthz`
+
+---
+
 ## 📚 常用命令速查
 
 ```bash
@@ -235,7 +278,7 @@ docker compose down
 
 ### `GET /healthz`
 
-健康检查，返回 `{"status":"ok"}`。
+健康检查，返回 `{"status":"ok","version":"2.0.1"}`。
 
 ### `POST /convert_single`
 
@@ -301,7 +344,7 @@ python3 -m venv .venv
 
 ## 🔄 持续集成
 
-GitHub Actions 会在 `master`、PR 和标签推送时先运行 `pytest`；PR 只构建镜像不推送，只有 `v*` 标签才会发布 `linux/amd64` + `linux/arm64` 镜像到 GHCR，并清理非当前版本的旧镜像。
+GitHub Actions 会在 `master`、PR 和标签推送时先运行 `pytest`；PR 只构建镜像不推送，只有 `v*` 标签才会发布 `linux/amd64` + `linux/arm64` 镜像到 GHCR，并清理无正式版本标签的构建镜像。正式 `X.Y.Z` 镜像会保留，避免固定版本失效；需要缩减存储时可手动清理 GHCR 旧版本。
 
 ## 📚 参考项目与资料
 

@@ -37,6 +37,7 @@ from geo_conversion import (
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024  # 10MB
+APP_VERSION = os.getenv("APP_VERSION", "dev").strip() or "dev"
 
 # ============================================================
 # 权威 EPSG 编码配置
@@ -650,9 +651,9 @@ def _map_origins():
 
 
 @app.context_processor
-def _inject_map_config():
-    """向模板注入前端公开地图配置。"""
-    return {"map_config": _get_map_config()}
+def _inject_app_context():
+    """向模板注入地图配置和运行版本。"""
+    return {"map_config": _get_map_config(), "app_version": APP_VERSION}
 
 
 @app.errorhandler(413)
@@ -1161,7 +1162,7 @@ def export_results(filename):
 @app.route("/healthz", methods=["GET"])
 def healthz():
     """Container/runtime health probe endpoint."""
-    return jsonify({"status": "ok"}), 200
+    return jsonify({"status": "ok", "version": APP_VERSION}), 200
 
 
 # ============================================================

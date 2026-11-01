@@ -673,6 +673,7 @@
             服务端未配置 Key 时，可在这里为当前浏览器填写。多名用户共用时，
             建议在部署环境变量中配置 <code>TIANDITU_KEY</code>。
         </p>
+        <p class="map-settings-help mb-2">应用版本：{{ app_version }}</p>
         <a href="https://console.tianditu.gov.cn/" target="_blank" rel="noopener noreferrer"
            class="map-settings-help">前往天地图控制台</a>
     </div>
@@ -684,7 +685,7 @@
 ══════════════════════════════════════════════════════ -->
 <script defer src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
 <script defer src="{{ url_for('static', filename='vendor/leaflet/leaflet.js') }}"></script>
-<script>window.MAP_CONFIG = {{ map_config|tojson }};</script>
+<script>window.MAP_CONFIG = {{ map_config|tojson }}; window.APP_VERSION = {{ app_version|tojson }};</script>
 
 <script>
 /* ============================================================
@@ -1979,7 +1980,7 @@ function init() {
         });
     }
 
-    addLog('程序启动成功：支持 WGS84 / CGCS2000 / GCJ02 / BD09', 'ok');
+    addLog(`程序启动成功 v${window.APP_VERSION || 'dev'}：支持 WGS84 / CGCS2000 / GCJ02 / BD09`, 'ok');
     addLog('支持格式：Excel(.xlsx) · CSV(.csv) · TXT(.txt)', 'info');
     addLog('X坐标 = 北方向(Northing) · Y坐标 = 东方向(Easting)', 'info');
     if (!mapEnabled()) {

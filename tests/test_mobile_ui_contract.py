@@ -57,6 +57,8 @@ def test_mobile_js_is_gated_and_wires_enhancements():
 
 def test_tianditu_settings_panel_exists():
     assert 'id="mapSettings"' in HTML
+    assert 'window.APP_VERSION' in HTML
+    assert '应用版本：' in HTML
     assert 'id="tianditu-key-input"' in HTML
     assert 'id="tianditu-key-save"' in HTML
     assert 'id="tianditu-key-clear"' in HTML

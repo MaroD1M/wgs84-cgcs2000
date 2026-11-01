@@ -4,7 +4,7 @@ import tempfile
 
 import pandas as pd
 
-from main import _get_map_config, _safe_excel_value, app, convert_coordinate
+from main import APP_VERSION, _get_map_config, _safe_excel_value, app, convert_coordinate
 
 
 def test_convert_single_wgs84_success():
@@ -89,6 +89,7 @@ def test_healthz_ok():
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["status"] == "ok"
+    assert data["version"] == APP_VERSION
 
 
 def test_gcj02_bd09_known_values_and_roundtrip():

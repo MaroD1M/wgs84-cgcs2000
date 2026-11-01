@@ -1,7 +1,7 @@
 # 技术文档与交接说明
 
 > 项目：`wgs84-cgcs2000`
-> 当前基线：`v2.0.0`
+> 当前基线：`v2.0.1`
 > 更新日期：2026-11-01
 > 适用读者：后续开发、测试、运维、项目负责人
 
@@ -225,7 +225,7 @@ Flask (main.py)
 - 上传大小限制、扩展名白名单、行数上限。
 - 前端输出使用 `textContent` / `escapeHtml`，地图弹窗使用 DOM 节点而非 HTML 字符串。
 - GitHub Actions：先跑 pytest，再构建 amd64 + arm64 镜像。
-- GHCR 镜像标签：`2.0.0`、`2.0`、`latest`。
+- GHCR 镜像标签：当前版本 `2.0.1`、`2.0`、`latest`；历史正式版本 `2.0.0` 继续保留。
 - README 包含部署、接口、地图配置、参考项目和界面预览。
 - 当前自动化测试 29 个。
 
@@ -338,7 +338,7 @@ Flask (main.py)
 
 1. `_get_map_config` 读取 `MAP_PROVIDER` 和 `TIANDITU_KEY`。
 2. `MAP_PROVIDER` 只接受 `tianditu` / `none`；旧值回退为 `tianditu`。
-3. `_inject_map_config` 把公开配置注入模板 `window.MAP_CONFIG`。
+3. `_inject_app_context` 把公开地图配置和应用版本注入模板。
 4. `_map_origins` 仅在天地图启用时加入 `https://*.tianditu.gov.cn`。
 5. `_add_security_headers` 写入 CSP。
 6. 前端 `getTiandituKey` 优先读取 localStorage，其次使用 `MAP_CFG.tianditu_key`。
@@ -588,7 +588,7 @@ GitHub Actions 会：
 2. PR 只构建镜像，不推送。
 3. `v*` 标签推送时才构建并推送 `linux/amd64` + `linux/arm64` 镜像。
 4. 推送 `X.Y.Z`、`X.Y`、`latest` 到 GHCR。
-5. 标签构建完成后清理非当前 `X.Y.Z` / `X.Y` 的旧 GHCR 版本。
+5. 标签构建完成后清理无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本；存储需要时可手动清理旧版本。
 6. 需要时在 GitHub Release 中记录镜像 digest。
 
 ### 7.7 代码风格与注释
@@ -609,7 +609,7 @@ GitHub Actions 会：
 | `MAP_PROVIDER` | `tianditu` | `tianditu` / `none` |
 | `TIANDITU_KEY` | 空 | 天地图浏览器端 Key，可由页面设置覆盖 |
 | `APP_PORT` | `5000` | compose 宿主机端口 |
-| `APP_VERSION` | `latest` | 镜像标签 |
+| `APP_VERSION` | `latest` | compose 镜像标签；发布构建时也写入镜像运行版本 |
 
 ### 8.2 部署方式
 
@@ -619,7 +619,7 @@ GitHub Actions 会：
 
 ### 8.3 健康检查与日志
 
-- 健康检查：`GET /healthz` 返回 `{"status":"ok"}`。
+- 健康检查：`GET /healthz` 返回 `{"status":"ok","version":"2.0.1"}`；`v2.0.1` 之前的镜像只有 `status`。
 - Gunicorn 日志输出到容器标准输出。
 - 批量临时文件：`/tmp/coord_cvt_*.xlsx`，默认保留约 1 小时。
 
@@ -682,7 +682,7 @@ GitHub Actions 会：
 
 
 
-## 11. v2.0.0 复核与发布记录
+## 11. v2.0.1 复核与发布记录
 
 ### 11.1 复核范围
 
@@ -712,7 +712,15 @@ GitHub Actions 会：
 
 复核中未发现新的高危代码执行路径或可直接利用的文件读写漏洞。项目当前没有登录和限流，不能直接暴露到公网。
 
-### 11.3 v2.0.0 地图迁移
+### 11.3 v2.0.1 修复
+
+- GHCR 清理策略改为只删除无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本，避免补丁发布后旧固定版本无法拉取。
+- `/healthz` 增加 `version` 字段；镜像构建通过 `APP_VERSION` 参数写入运行版本。
+- 地图设置面板显示当前应用版本，便于核对镜像标签和运行实例。
+- README 增加 Git 标签与镜像标签对照、`manifest unknown` 排查和版本固定示例。
+- 新增 `CHANGELOG.md`，持续记录后续版本变化。
+
+### 11.4 v2.0.0 地图迁移
 
 - 移除 OpenStreetMap、`OSM_TILE_URL`、OSM 外部反代方案。
 - 移除自定义 XYZ 瓦片、`MAP_TILE_URL`、`MAP_TILE_ATTRIBUTION`、`MAP_TILE_CRS`。
@@ -721,7 +729,7 @@ GitHub Actions 会：
 - 未配置 Key 时地图勾选禁用，页面提供“地图设置”入口。
 - 天地图瓦片连续失败时显示 Key、白名单和网络排查提示。
 
-### 11.4 测试与验证记录
+### 11.5 测试与验证记录
 
 | 检查 | 命令/方式 | 结果 |
 | --- | --- | --- |
@@ -744,7 +752,7 @@ GitHub Actions 会：
 | 桌面端回归 | 768 / 1280 / 1440 截图对比 | 除新增地图设置入口外布局稳定 |
 | 文档链接 | README 图片与技术文档 | 均存在 |
 
-### 11.5 本次复核后的残余风险
+### 11.6 本次复核后的残余风险
 
 1. 无登录、无权限、无限流；公网部署前必须加反向代理认证和限流。
 2. 临时导出文件保存在 `/tmp`，没有用户归属校验；依赖随机文件名和 1 小时清理。
@@ -755,17 +763,13 @@ GitHub Actions 会：
 7. 单实例架构不适合多副本共享临时文件；扩容前需要任务队列和对象存储。
 8. 天地图 Key 为浏览器端 Key，必须依赖域名白名单和 HTTPS 降低滥用风险。
 
-### 11.6 发布前检查清单
+### 11.7 发布后验证
 
-- [x] 版本号更新为 `2.0.0`
-- [x] 天地图 Key 设置面板与无 Key 引导完成
-- [x] OSM / 自定义瓦片代码、配置和文档移除
-- [x] 敏感信息扫描未发现真实密钥
-- [x] README / 技术文档 / 预览图链接有效
-- [x] 29 个 pytest 通过
-- [x] GitHub Actions 的 test 与 docker job 成功
-- [x] 远端历史 tag / release 清理完成
-- [x] v2.0.0 构建后旧 GHCR 镜像版本清理完成（仅保留 2.0.0 / 2.0 / latest）
+- 推送标签后确认 GitHub Actions 的 test 与 docker job 成功。
+- 确认 GHCR 同时保留 `2.0.0` 和 `2.0.1` 正式版本，`latest` 指向 `2.0.1`。
+- 通过 `/healthz` 核对运行版本，确认不是 `dev` 或旧版本。
+- 确认远端只有预期的 tag / release，无历史构建镜像残留。
+- 发现未同步文档时，直接更新 README、CHANGELOG 或本文档，不积压到下次发布。
 
 ---
 
@@ -779,3 +783,5 @@ GitHub Actions 会：
 - Bootstrap / Leaflet / 天地图
 
 README 入口：[`README.md`](../README.md)
+
+更新记录：[`CHANGELOG.md`](../CHANGELOG.md)
