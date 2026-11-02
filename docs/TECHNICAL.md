@@ -1,8 +1,8 @@
 # 技术文档与交接说明
 
 > 项目：`wgs84-cgcs2000`
-> 当前基线：`v2.0.2`
-> 更新日期：2026-11-01
+> 当前基线：`v2.0.3`
+> 更新日期：2026-11-02
 > 适用读者：后续开发、测试、运维、项目负责人
 
 ## 0. 阅读建议
@@ -225,7 +225,7 @@ Flask (main.py)
 - 上传大小限制、扩展名白名单、行数上限。
 - 前端输出使用 `textContent` / `escapeHtml`，地图弹窗使用 DOM 节点而非 HTML 字符串。
 - GitHub Actions：先跑 pytest，再构建 amd64 + arm64 镜像。
-- GHCR 镜像标签：当前版本 `2.0.2`、`2.0`、`latest`；历史正式版本 `2.0.0`、`2.0.1` 继续保留。
+- GHCR 镜像标签：当前版本 `2.0.3`、`2.0`、`latest`；历史损坏版本 `2.0.0`、`2.0.1`、`2.0.2` 已清理。
 - README 包含部署、接口、地图配置、参考项目和界面预览。
 - 当前自动化测试 29 个。
 
@@ -590,7 +590,7 @@ GitHub Actions 会：
 4. 使用 Docker manifest list 输出，关闭 provenance / SBOM，兼容旧版 Docker。
 5. 推送 `X.Y.Z`、`X.Y`、`latest` 到 GHCR。
 6. 发布后校验 manifest 类型、无 `unknown/unknown`，并运行镜像核对 `APP_VERSION`。
-7. 清理无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本。
+7. 发布后只清理指定的历史错误版本；禁止按“无标签”删除 GHCR 版本，避免误删多架构子 manifest。
 
 ### 7.7 代码风格与注释
 
@@ -620,7 +620,7 @@ GitHub Actions 会：
 
 ### 8.3 健康检查与日志
 
-- 健康检查：`GET /healthz` 返回 `{"status":"ok","version":"2.0.2"}`；`v2.0.1` 之前的镜像只有 `status`。
+- 健康检查：`GET /healthz` 返回 `{"status":"ok","version":"2.0.3"}`；`v2.0.1` 之前的镜像只有 `status`。
 - Gunicorn 日志输出到容器标准输出。
 - 批量临时文件：`/tmp/coord_cvt_*.xlsx`，默认保留约 1 小时。
 
@@ -631,7 +631,7 @@ GitHub Actions 会：
 | 地图不显示 | 未配置天地图 Key | 打开页面“地图设置”填写 Key，或配置 `TIANDITU_KEY` |
 | 地图瓦片被 CSP 拦截 | CSP 未包含天地图域名 | 检查 `MAP_PROVIDER` 和 `_map_origins`，重启服务 |
 | 天地图提示 Key 无效 | Key 错误或域名未加入白名单 | 检查天地图控制台 Key、域名/IP 白名单和 HTTPS |
-| 群晖拉取 manifest unknown | 标签不存在，或旧 Docker 不兼容 OCI index | 使用 `2.0.2`+；检查 `docker version` / `docker manifest inspect`；必要时重建 Container Manager 项目，或临时指定 `platform: linux/amd64` |
+| 群晖拉取 manifest unknown | 标签不存在，或索引引用的子 manifest 被误删 | 使用 `2.0.3`；检查 `docker version` / `docker manifest inspect`；必要时重建 Container Manager 项目，或临时指定 `platform: linux/amd64` |
 | 复制按钮失败 | 非 HTTPS 且浏览器不支持回退 | 已在代码中回退；仍失败时检查浏览器权限 |
 | 批量导出 404 | 临时文件过期或服务重启 | 重新执行批量转换 |
 | 上传 413 | 超过 10MB | 拆分文件或调整 `MAX_CONTENT_LENGTH` |
@@ -684,7 +684,7 @@ GitHub Actions 会：
 
 
 
-## 11. v2.0.2 复核与发布记录
+## 11. v2.0.3 复核与发布记录
 
 ### 11.1 复核范围
 
@@ -715,6 +715,12 @@ GitHub Actions 会：
 复核中未发现新的高危代码执行路径或可直接利用的文件读写漏洞。项目当前没有登录和限流，不能直接暴露到公网。
 
 ### 11.3 近期修复
+
+v2.0.3：
+
+- 修复 GHCR 清理逻辑按“无标签”删除版本、误删多架构子 manifest 的问题；镜像索引不再悬空，`manifest unknown` 已解决。
+- 移除自动删除无标签版本的步骤，改为只清理指定的历史错误版本。
+- 重新发布 `2.0.3`、`2.0`、`latest`，清理已损坏的 `2.0.0`、`2.0.1`、`2.0.2`。
 
 v2.0.2：
 
@@ -777,8 +783,8 @@ v2.0.1：
 ### 11.7 发布后验证
 
 - 推送标签后确认 GitHub Actions 的 test 与 docker job 成功。
-- 确认 GHCR 保留 `2.0.0`、`2.0.1`、`2.0.2` 正式版本，`latest` 指向 `2.0.2`。
-- 确认 `2.0.2` manifest 类型为 `application/vnd.docker.distribution.manifest.list.v2+json`，无 `unknown/unknown`。
+- 确认 GHCR 仅保留 `2.0.3` 及其子 manifest，`latest` 指向 `2.0.3`；`2.0.0`、`2.0.1`、`2.0.2` 已删除。
+- 确认 `2.0.3` manifest 类型为 `application/vnd.docker.distribution.manifest.list.v2+json`，无 `unknown/unknown`。
 - 通过 `/healthz` 核对运行版本，确认不是 `dev` 或旧版本。
 - 确认远端只有预期的 tag / release，无历史构建镜像残留。
 - 发现未同步文档时，直接更新 README、CHANGELOG 或本文档，不积压到下次发布。

@@ -1,5 +1,12 @@
 # 更新记录
 
+## v2.0.3 - 2026-11-02
+
+- 修复 GHCR 清理逻辑误删多架构子 manifest、导致镜像索引悬空并报 `manifest unknown` 的问题。
+- 移除按“无标签”自动删除 GHCR 版本的步骤；只清理指定的历史错误版本，绝不删除无标签的子 manifest。
+- 重新发布 `2.0.3`、`2.0`、`latest`，并清理已损坏的 `2.0.0`、`2.0.1`、`2.0.2` 镜像版本。
+- CI 发布后校验保持：确认 manifest 类型、无 `unknown/unknown`，并运行镜像核对 `APP_VERSION`。
+
 ## v2.0.2 - 2026-11-01
 
 - 发布镜像改为 Docker manifest list，关闭 provenance/SBOM attestation，修复部分群晖 Container Manager / 旧版 Docker 拉取时报 `manifest unknown` 的兼容性问题。
