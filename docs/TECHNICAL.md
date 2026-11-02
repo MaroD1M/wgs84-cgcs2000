@@ -1,7 +1,7 @@
 # 技术文档与交接说明
 
 > 项目：`wgs84-cgcs2000`
-> 当前基线：`v2.0.1`
+> 当前基线：`v2.0.2`
 > 更新日期：2026-11-01
 > 适用读者：后续开发、测试、运维、项目负责人
 
@@ -225,7 +225,7 @@ Flask (main.py)
 - 上传大小限制、扩展名白名单、行数上限。
 - 前端输出使用 `textContent` / `escapeHtml`，地图弹窗使用 DOM 节点而非 HTML 字符串。
 - GitHub Actions：先跑 pytest，再构建 amd64 + arm64 镜像。
-- GHCR 镜像标签：当前版本 `2.0.1`、`2.0`、`latest`；历史正式版本 `2.0.0` 继续保留。
+- GHCR 镜像标签：当前版本 `2.0.2`、`2.0`、`latest`；历史正式版本 `2.0.0`、`2.0.1` 继续保留。
 - README 包含部署、接口、地图配置、参考项目和界面预览。
 - 当前自动化测试 29 个。
 
@@ -585,11 +585,12 @@ git push origin vX.Y.Z
 GitHub Actions 会：
 
 1. 在 `master`、PR 和标签推送时运行 pytest。
-2. PR 只构建镜像，不推送。
-3. `v*` 标签推送时才构建并推送 `linux/amd64` + `linux/arm64` 镜像。
-4. 推送 `X.Y.Z`、`X.Y`、`latest` 到 GHCR。
-5. 标签构建完成后清理无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本；存储需要时可手动清理旧版本。
-6. 需要时在 GitHub Release 中记录镜像 digest。
+2. `master` / PR 只跑测试，不构建或推送镜像。
+3. `v*` 标签推送时构建 `linux/amd64` + `linux/arm64` 镜像。
+4. 使用 Docker manifest list 输出，关闭 provenance / SBOM，兼容旧版 Docker。
+5. 推送 `X.Y.Z`、`X.Y`、`latest` 到 GHCR。
+6. 发布后校验 manifest 类型、无 `unknown/unknown`，并运行镜像核对 `APP_VERSION`。
+7. 清理无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本。
 
 ### 7.7 代码风格与注释
 
@@ -619,7 +620,7 @@ GitHub Actions 会：
 
 ### 8.3 健康检查与日志
 
-- 健康检查：`GET /healthz` 返回 `{"status":"ok","version":"2.0.1"}`；`v2.0.1` 之前的镜像只有 `status`。
+- 健康检查：`GET /healthz` 返回 `{"status":"ok","version":"2.0.2"}`；`v2.0.1` 之前的镜像只有 `status`。
 - Gunicorn 日志输出到容器标准输出。
 - 批量临时文件：`/tmp/coord_cvt_*.xlsx`，默认保留约 1 小时。
 
@@ -630,6 +631,7 @@ GitHub Actions 会：
 | 地图不显示 | 未配置天地图 Key | 打开页面“地图设置”填写 Key，或配置 `TIANDITU_KEY` |
 | 地图瓦片被 CSP 拦截 | CSP 未包含天地图域名 | 检查 `MAP_PROVIDER` 和 `_map_origins`，重启服务 |
 | 天地图提示 Key 无效 | Key 错误或域名未加入白名单 | 检查天地图控制台 Key、域名/IP 白名单和 HTTPS |
+| 群晖拉取 manifest unknown | 标签不存在，或旧 Docker 不兼容 OCI index | 使用 `2.0.2`+；检查 `docker version` / `docker manifest inspect`；必要时重建 Container Manager 项目，或临时指定 `platform: linux/amd64` |
 | 复制按钮失败 | 非 HTTPS 且浏览器不支持回退 | 已在代码中回退；仍失败时检查浏览器权限 |
 | 批量导出 404 | 临时文件过期或服务重启 | 重新执行批量转换 |
 | 上传 413 | 超过 10MB | 拆分文件或调整 `MAX_CONTENT_LENGTH` |
@@ -682,7 +684,7 @@ GitHub Actions 会：
 
 
 
-## 11. v2.0.1 复核与发布记录
+## 11. v2.0.2 复核与发布记录
 
 ### 11.1 复核范围
 
@@ -712,13 +714,21 @@ GitHub Actions 会：
 
 复核中未发现新的高危代码执行路径或可直接利用的文件读写漏洞。项目当前没有登录和限流，不能直接暴露到公网。
 
-### 11.3 v2.0.1 修复
+### 11.3 近期修复
 
-- GHCR 清理策略改为只删除无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本，避免补丁发布后旧固定版本无法拉取。
+v2.0.2：
+
+- 镜像构建改为 Docker manifest list，关闭 provenance / SBOM attestation，修复旧版 Docker / 群晖 Container Manager 对 OCI index 兼容不足导致的 `manifest unknown`。
+- CI 增加 manifest 类型、`unknown/unknown` 和运行版本校验。
+- `master` / PR 不再构建镜像，只有标签发布镜像，减少无效构建产物。
+- README 增加群晖 Docker 版本排查和项目缓存处理说明。
+
+v2.0.1：
+
+- GHCR 清理策略改为只删除无正式版本标签的构建镜像，保留所有 `X.Y.Z` 正式版本。
 - `/healthz` 增加 `version` 字段；镜像构建通过 `APP_VERSION` 参数写入运行版本。
-- 地图设置面板显示当前应用版本，便于核对镜像标签和运行实例。
-- README 增加 Git 标签与镜像标签对照、`manifest unknown` 排查和版本固定示例。
-- 新增 `CHANGELOG.md`，持续记录后续版本变化。
+- 地图设置面板显示当前应用版本。
+- 新增 `CHANGELOG.md`。
 
 ### 11.4 v2.0.0 地图迁移
 
@@ -749,6 +759,7 @@ GitHub Actions 会：
 | 移动端布局 | 320 / 360 / 390 / 430px + 844×390 横屏 | 无横向溢出，标签不换行，输入 16px，触控 ≥44px |
 | 移动端表格 | 批量 / DMS 卡片列表 | 表头隐藏、字段标签完整、无横向滚动 |
 | 移动端地图 | 天地图 + 触摸模拟 | 单点/批量标记、42px 控件、竖屏 300px / 横屏 220px |
+| 镜像兼容性 | CI manifest 校验 + 容器运行 | Docker manifest list、APP_VERSION 一致 |
 | 桌面端回归 | 768 / 1280 / 1440 截图对比 | 除新增地图设置入口外布局稳定 |
 | 文档链接 | README 图片与技术文档 | 均存在 |
 
@@ -766,7 +777,8 @@ GitHub Actions 会：
 ### 11.7 发布后验证
 
 - 推送标签后确认 GitHub Actions 的 test 与 docker job 成功。
-- 确认 GHCR 同时保留 `2.0.0` 和 `2.0.1` 正式版本，`latest` 指向 `2.0.1`。
+- 确认 GHCR 保留 `2.0.0`、`2.0.1`、`2.0.2` 正式版本，`latest` 指向 `2.0.2`。
+- 确认 `2.0.2` manifest 类型为 `application/vnd.docker.distribution.manifest.list.v2+json`，无 `unknown/unknown`。
 - 通过 `/healthz` 核对运行版本，确认不是 `dev` 或旧版本。
 - 确认远端只有预期的 tag / release，无历史构建镜像残留。
 - 发现未同步文档时，直接更新 README、CHANGELOG 或本文档，不积压到下次发布。
