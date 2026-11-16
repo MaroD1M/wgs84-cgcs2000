@@ -1,5 +1,7 @@
 # 🌍 坐标转换工具（WGS84 / CGCS2000 / GCJ02 / BD09）
 
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+
 一个开箱即用的 Web 坐标转换服务，支持 **WGS84、CGCS2000 高斯投影、GCJ02（火星）、BD09（百度）** 任意组合转换，提供：
 
 - 📍 单点坐标转换
@@ -372,7 +374,7 @@ python3 -m venv .venv
 
 ## 🔄 持续集成
 
-GitHub Actions 在 `master`、PR 和标签推送时运行 `pytest`；只有 `v*` 标签才构建并发布 `linux/amd64` + `linux/arm64` 镜像。发布镜像使用 Docker manifest list（关闭 provenance/SBOM），并自动校验 manifest 类型和运行版本。正式 `X.Y.Z` 镜像会保留，避免固定版本失效；需要缩减存储时可手动清理 GHCR 旧版本。
+GitHub Actions 仅在 PR 和 `v*` 标签推送时运行 `pytest`；普通分支推送不会触发任何工作流。只有创建新的 `v*` 版本标签才会构建并发布 `linux/amd64` + `linux/arm64` 镜像。发布镜像使用 Docker manifest list（关闭 provenance/SBOM），并自动校验 manifest 类型和运行版本。正式 `X.Y.Z` 镜像会保留，避免固定版本失效；需要缩减存储时可手动清理 GHCR 旧版本。
 
 ## 📚 参考项目与资料
 
@@ -406,3 +408,11 @@ Bootstrap 与 Leaflet 已本地化到 `static/vendor/`，其许可证分别见�
 - GCJ02 / BD09 为公开近似算法，仅适用于中国范围；与官方接口结果可能存在米级差异。
 - CGCS2000 投影转换使用 PROJ / EPSG 参数；涉及正式测绘成果时，请以官方 SDK、控制点成果和当地测绘规范为准。
 - README 中的北京天安门、上海人民广场等坐标仅用于功能演示。
+
+## 📄 许可证
+
+Copyright (c) 2026 MaroD1M
+
+本项目使用 [GNU Affero General Public License v3.0（AGPL-3.0）](LICENSE) 发布。
+你可以自由使用、修改和分发本项目，但分发衍生作品或通过网络向用户提供服务时，
+必须按 AGPL-3.0 的要求提供完整对应源码。详见 [LICENSE](LICENSE)。

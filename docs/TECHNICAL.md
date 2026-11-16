@@ -224,7 +224,7 @@ Flask (main.py)
 - CSP、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`。
 - 上传大小限制、扩展名白名单、行数上限。
 - 前端输出使用 `textContent` / `escapeHtml`，地图弹窗使用 DOM 节点而非 HTML 字符串。
-- GitHub Actions：先跑 pytest，再构建 amd64 + arm64 镜像。
+- GitHub Actions：PR 与 `v*` 标签运行 pytest；仅 `v*` 标签构建 amd64 + arm64 镜像，普通分支推送不触发工作流。
 - GHCR 镜像标签：当前版本 `2.0.3`、`2.0`、`latest`；历史损坏版本 `2.0.0`、`2.0.1`、`2.0.2` 已清理。
 - README 包含部署、接口、地图配置、参考项目和界面预览。
 - 当前自动化测试 29 个。
@@ -291,7 +291,7 @@ Flask (main.py)
 │   ├── TECHNICAL.md              本文档
 │   └── images/                   README 预览图（WebP）
 ├── .github/workflows/
-│   └── docker-image.yml          pytest + 多架构镜像发布
+│   └── docker-image.yml          PR/tag 测试 + 标签触发多架构镜像发布
 ├── Dockerfile
 ├── docker-compose.yml            群晖/单机简化版
 ├── docker-compose.full.yml       进阶安全版
@@ -463,7 +463,7 @@ Flask (main.py)
 | 多租户 | 当前单实例单团队使用 |
 | 审计与留存 | 当前无操作审计、无历史任务列表 |
 | 集群部署 | 当前临时文件与内存状态不适合多副本 |
-| 许可证 | 仓库尚未声明开源许可证，接手前需确认发布范围 |
+| 许可证 | AGPL-3.0；分发衍生作品或通过网络提供服务时须提供完整对应源码 |
 
 ### 5.4 不建议现在做的事
 
@@ -584,9 +584,9 @@ git push origin vX.Y.Z
 
 GitHub Actions 会：
 
-1. 在 `master`、PR 和标签推送时运行 pytest。
-2. `master` / PR 只跑测试，不构建或推送镜像。
-3. `v*` 标签推送时构建 `linux/amd64` + `linux/arm64` 镜像。
+1. 仅在 PR 和 `v*` 标签推送时运行 pytest；普通分支推送不触发工作流。
+2. PR 只跑测试，不构建或推送镜像。
+3. 创建新的 `v*` 版本标签后构建 `linux/amd64` + `linux/arm64` 镜像。
 4. 使用 Docker manifest list 输出，关闭 provenance / SBOM，兼容旧版 Docker。
 5. 推送 `X.Y.Z`、`X.Y`、`latest` 到 GHCR。
 6. 发布后校验 manifest 类型、无 `unknown/unknown`，并运行镜像核对 `APP_VERSION`。
